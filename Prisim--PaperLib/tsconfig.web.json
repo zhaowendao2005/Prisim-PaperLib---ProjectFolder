@@ -1,0 +1,14 @@
+{
+  "extends": ["@electron-toolkit/tsconfig/tsconfig.web.json", "./tsconfig.json"],
+  "include": [
+    "apps/client/src/env.d.ts",
+    "apps/client/src/**/*",
+    "apps/client/src/**/*.vue",
+    "apps/shared/**/*",
+    "apps/electron/preload/*.d.ts",
+    "public/**/*"
+  ],
+  "compilerOptions": {
+    "composite": true
+  }
+}

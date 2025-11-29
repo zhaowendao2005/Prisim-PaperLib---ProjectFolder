@@ -1,0 +1,13 @@
+{
+  "extends": ["@electron-toolkit/tsconfig/tsconfig.node.json", "./tsconfig.json"],
+  "include": [
+    "apps/electron/main/**/*",
+    "apps/electron/preload/**/*",
+    "apps/shared/**/*",
+    "public/**/*"
+  ],
+  "compilerOptions": {
+    "composite": true,
+    "types": ["electron-vite/node"]
+  }
+}
