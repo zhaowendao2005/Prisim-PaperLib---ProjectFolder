@@ -101,11 +101,9 @@ function selectPaper(paper: typeof papers.value[0]) {
   width: 256px;
   display: flex;
   flex-direction: column;
-  border-radius: 16px;
-  border: 1px solid var(--color-border-light);
+  border-right: 1px solid var(--color-border-light);
   background-color: var(--color-bg-sidebar);
   backdrop-filter: blur(24px);
-  box-shadow: var(--shadow-sm);
   transition: all 0.3s;
 }
 

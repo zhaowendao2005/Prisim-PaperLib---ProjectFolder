@@ -3,13 +3,16 @@
  * 主页面 - 布局容器
  */
 import { ref } from 'vue'
+import { useTabManager } from '@composables/page-navigation'
 
 import Topbar from './topbar/index.vue'
-import LeftSidebar from './content/left-sidebar/index.vue'
-import MainPanel from './content/main-panel/index.vue'
-import RightSidebar from './content/right-sidebar/index.vue'
+import Tabbar from './tabbar/index.vue'
+import HomePage from './content/home-page/index.vue'
+import ProjectPage from './content/project-page/index.vue'
+import NewTabPage from './content/new-tab-page/index.vue'
 
 const isDark = ref(false)
+const { activeTab } = useTabManager()
 </script>
 
 <template>
@@ -18,11 +21,14 @@ const isDark = ref(false)
     <!-- 1. Title Bar -->
     <Topbar />
 
-    <!-- 2. Main Layout -->
+    <!-- 2. Tab Bar -->
+    <Tabbar />
+
+    <!-- 3. Main Layout -->
     <main class="main-layout">
-      <LeftSidebar />
-      <MainPanel />
-      <RightSidebar />
+      <HomePage v-if="activeTab?.type === 'home'" />
+      <ProjectPage v-else-if="activeTab?.type === 'project'" />
+      <NewTabPage v-else-if="activeTab?.type === 'new-tab'" />
     </main>
   </div>
 </template>
@@ -45,7 +51,5 @@ const isDark = ref(false)
   flex: 1;
   display: flex;
   overflow: hidden;
-  padding: 8px 12px 12px;
-  gap: 12px;
 }
 </style>

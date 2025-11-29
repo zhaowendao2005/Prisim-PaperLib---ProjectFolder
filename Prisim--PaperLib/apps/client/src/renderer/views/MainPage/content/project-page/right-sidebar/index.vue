@@ -4,8 +4,9 @@
  * 包含：分段控制、Notes 标签页、AI 标签页
  */
 import { ref } from 'vue'
+import { useRightSidebarTab } from '@composables/page-navigation'
 
-const rightTab = ref<'notes' | 'ai'>('notes')
+const { activeRightTab } = useRightSidebarTab()
 
 // 临时模拟数据
 const selectedPaper = ref({
@@ -20,15 +21,15 @@ const selectedPaper = ref({
     <!-- Segmented Control -->
     <div class="segment-wrapper">
       <div class="segment-control">
-        <button class="segment-btn" :class="{ active: rightTab === 'notes' }" @click="rightTab = 'notes'">Notes</button>
-        <button class="segment-btn" :class="{ active: rightTab === 'ai' }" @click="rightTab = 'ai'">AI Assistant</button>
+        <button class="segment-btn" :class="{ active: activeRightTab === 'notes' }" @click="activeRightTab = 'notes'">Notes</button>
+        <button class="segment-btn" :class="{ active: activeRightTab === 'ai' }" @click="activeRightTab = 'ai'">AI Assistant</button>
       </div>
     </div>
 
     <!-- Tab Content -->
     <div class="tab-content custom-scrollbar">
       <!-- Notes Tab -->
-      <div v-if="rightTab === 'notes'" class="notes-tab">
+      <div v-if="activeRightTab === 'notes'" class="notes-tab">
         <div class="metadata-card">
           <div class="metadata-header">
             <div class="status-dot" />
@@ -59,7 +60,7 @@ Key takeaways:
       </div>
 
       <!-- AI Tab -->
-      <div v-if="rightTab === 'ai'" class="ai-tab">
+      <div v-if="activeRightTab === 'ai'" class="ai-tab">
         <div class="chat-messages">
           <!-- AI Message -->
           <div class="chat-row ai">
@@ -110,11 +111,9 @@ Key takeaways:
   width: 320px;
   display: flex;
   flex-direction: column;
-  border-radius: 16px;
-  border: 1px solid var(--color-border-light);
+  border-left: 1px solid var(--color-border-light);
   background-color: var(--color-bg-sidebar);
   backdrop-filter: blur(24px);
-  box-shadow: var(--shadow-sm);
   transition: all 0.3s;
 }
 

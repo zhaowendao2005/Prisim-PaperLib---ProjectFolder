@@ -3,11 +3,16 @@
  * MainPage 顶部标题栏组件
  * 基于公共 Titlebar 组件，添加页面特有的拖拽区域和工具栏
  */
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { useTabManager } from '@composables/page-navigation'
 
 import Titlebar from '@components/titlebar/index.vue'
 
 const isDark = ref(false)
+const { activeTab } = useTabManager()
+
+// 是否显示 title-pill（仅在 project 页面显示）
+const showTitlePill = computed(() => activeTab.value?.type === 'project')
 
 // 临时：selectedPaper 标题显示
 const selectedPaperTitle = ref('Attention Is All You Need')
@@ -18,7 +23,7 @@ const selectedPaperTitle = ref('Attention Is All You Need')
   <Titlebar>
     <!-- Title / Drag Area -->
     <div class="title-drag-area">
-      <div class="title-pill">
+      <div v-if="showTitlePill" class="title-pill">
         <svg class="icon-doc" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
@@ -90,7 +95,7 @@ const selectedPaperTitle = ref('Attention Is All You Need')
 .title-filename {
   font-size: 12px;
   opacity: 0.6;
-  max-width: 200px;
+  max-width: 360px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

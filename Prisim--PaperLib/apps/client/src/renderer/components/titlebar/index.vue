@@ -69,11 +69,11 @@ const handleMaximize = () => {
 <style scoped>
 /* ========== Title Bar ========== */
 .titlebar {
-  height: 48px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
+  padding: 0 12px;
   user-select: none;
   background-color: var(--color-bg-toolbar);
   backdrop-filter: blur(12px);
