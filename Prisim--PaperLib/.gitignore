@@ -4,6 +4,7 @@ out
 .DS_Store
 .eslintcache
 *.log*
+Script/.log/
 
 # Build outputs
 electron.dist/

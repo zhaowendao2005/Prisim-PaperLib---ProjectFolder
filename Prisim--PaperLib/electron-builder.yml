@@ -20,7 +20,20 @@ nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
-  createDesktopShortcut: always
+  # 允许用户选择安装路径
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  # 快捷方式选项
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  # 安装完成后运行
+  runAfterFinish: true
+  # 允许提升权限（安装到 Program Files）
+  allowElevation: true
+  # 安装界面语言
+  installerLanguages:
+    - zh_CN
+    - en_US
 mac:
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:

@@ -132,12 +132,12 @@ export default defineConfig(
         }
       ],
 
-      // stores 目录下的文件命名规范：*.store.ts, *.mock.ts, *.datasource.ts, index.ts
+      // stores 目录下的文件命名规范：*.store.ts, *.mock.ts, *.datasource.ts, *.electron.ts, index.ts
       // services 目录下的文件命名规范：*.service.ts, index.ts
       'check-file/filename-naming-convention': [
         'error',
         {
-          '**/stores/**/!(*index).ts': '+([a-z0-9-]).@(store|mock|datasource).ts',
+          '**/stores/**/!(*index).ts': '+([a-z0-9-]).@(store|mock|datasource|electron).ts',
           '**/services/**/!(*index).ts': '+([a-z0-9-]).service.ts'
         },
         { ignoreMiddleExtensions: true }
