@@ -1,0 +1,46 @@
+{
+    "configurations": [
+        {
+            "name": "Prisim PaperLib Dev",
+            "request": "launch",
+            "runtimeArgs": [
+                "dev"
+            ],
+            "runtimeExecutable": "pnpm",
+            "cwd": "${workspaceFolder}/Prisim--PaperLib",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "type": "node",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Prisim PaperLib Dev:Web",
+            "request": "launch",
+            "runtimeArgs": [
+                "dev:web"
+            ],
+            "runtimeExecutable": "pnpm",
+            "cwd": "${workspaceFolder}/Prisim--PaperLib",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "type": "node",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Prisim PaperLib Install",
+            "request": "launch",
+            "runtimeArgs": [
+                "install"
+            ],
+            "runtimeExecutable": "pnpm",
+            "cwd": "${workspaceFolder}/Prisim--PaperLib",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "type": "node",
+            "console": "integratedTerminal"
+        }
+    ]
+}

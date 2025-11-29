@@ -1,0 +1,44 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Prisim PaperLib Dev",
+            "type": "shell",
+            "command": "pnpm dev",
+            "options": {
+                "cwd": "${workspaceFolder}/Prisim--PaperLib"
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Prisim PaperLib Dev:Web",
+            "type": "shell",
+            "command": "pnpm dev:web",
+            "options": {
+                "cwd": "${workspaceFolder}/Prisim--PaperLib"
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Prisim PaperLib Install",
+            "type": "shell",
+            "command": "pnpm install",
+            "options": {
+                "cwd": "${workspaceFolder}/Prisim--PaperLib"
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            },
+            "problemMatcher": []
+        }
+    ]
+}
