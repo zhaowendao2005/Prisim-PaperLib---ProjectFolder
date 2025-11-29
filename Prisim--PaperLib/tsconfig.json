@@ -3,6 +3,8 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["apps/client/src/*"],
+      "@renderer/*": ["apps/client/src/renderer/*"],
+      "@core/*": ["apps/client/src/core/*"],
       "@shared/*": ["apps/shared/*"],
       "@public/*": ["public/*"],
       "@assets/*": ["public/assets/*"]
