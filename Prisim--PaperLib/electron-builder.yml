@@ -16,7 +16,13 @@ asarUnpack:
   - resources/**
 win:
   executableName: prisim--paperlib
+  # 使用 build/icon.ico 作为应用图标
+  icon: build/icon.ico
 nsis:
+  # 安装程序图标
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  installerHeaderIcon: build/icon.ico
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
