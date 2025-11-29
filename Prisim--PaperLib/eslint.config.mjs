@@ -96,7 +96,11 @@ export default defineConfig(
       // 允许单词组件名（如 App.vue）
       'vue/multi-word-component-names': 'off',
       // 强制 <script lang="ts">
-      'vue/block-lang': ['error', { script: { lang: 'ts' } }]
+      'vue/block-lang': ['error', { script: { lang: 'ts' } }],
+      // 关闭过于严格的格式规则（交给 Prettier 处理）
+      'vue/max-attributes-per-line': 'off',
+      'vue/singleline-html-element-content-newline': 'off',
+      'vue/html-self-closing': 'off'
     }
   },
 
@@ -108,25 +112,33 @@ export default defineConfig(
     },
     rules: {
       // 禁止深层相对路径（超过2级），强制使用别名
+      // 静态资源（图片、字体、样式等）豁免：只限制 .ts/.tsx/.vue/.js 文件的引用
       'no-restricted-imports': [
         'error',
         {
           patterns: [
             {
-              group: ['../../../*', '../../../../*', '../../../../../*'],
+              group: [
+                '../../../*.ts',
+                '../../../*.tsx',
+                '../../../*.vue',
+                '../../../*.js',
+                '../../../../*',
+                '../../../../../*'
+              ],
               message: '禁止跨2级以上目录引用，请使用别名（如 @/、@shared/、@public/）'
             }
           ]
         }
       ],
 
-      // stores 目录下的文件命名规范：*.store.ts, *.mock.ts, *.datasource.ts
-      // services 目录下的文件命名规范：*.service.ts
+      // stores 目录下的文件命名规范：*.store.ts, *.mock.ts, *.datasource.ts, index.ts
+      // services 目录下的文件命名规范：*.service.ts, index.ts
       'check-file/filename-naming-convention': [
         'error',
         {
-          '**/stores/**/*.ts': '+([a-z0-9-]).@(store|mock|datasource).ts',
-          '**/services/**/*.ts': '+([a-z0-9-]).service.ts'
+          '**/stores/**/!(*index).ts': '+([a-z0-9-]).@(store|mock|datasource).ts',
+          '**/services/**/!(*index).ts': '+([a-z0-9-]).service.ts'
         },
         { ignoreMiddleExtensions: true }
       ],

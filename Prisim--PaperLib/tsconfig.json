@@ -7,7 +7,8 @@
       "@core/*": ["apps/client/src/core/*"],
       "@shared/*": ["apps/shared/*"],
       "@public/*": ["public/*"],
-      "@assets/*": ["public/assets/*"]
+      "@assets/*": ["public/assets/*"],
+      "@resources/*": ["resources/*"]
     }
   },
   "files": [],

@@ -32,6 +32,6 @@ export default defineConfig({
         input: resolve(rootDir, 'apps/client/index.html')
       }
     },
-    plugins: [vue(), tsconfigPaths()]
+    plugins: [vue(), tsconfigPaths({ projects: [resolve(rootDir, 'tsconfig.web.json')] })]
   }
 })
