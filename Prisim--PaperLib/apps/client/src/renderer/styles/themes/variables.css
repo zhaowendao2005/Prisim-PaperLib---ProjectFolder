@@ -1,0 +1,75 @@
+/**
+ * 主题颜色变量定义
+ * 基于 Mainpage.html 原型提取
+ */
+
+:root {
+  /* ========== 亮色主题 ========== */
+  
+  /* 背景色 */
+  --color-bg-primary: #F5F5F7;
+  --color-bg-secondary: #FFFFFF;
+  --color-bg-sidebar: rgba(255, 255, 255, 0.7);
+  --color-bg-card: #FFFFFF;
+  --color-bg-input: rgba(0, 0, 0, 0.05);
+  --color-bg-hover: rgba(0, 0, 0, 0.05);
+  --color-bg-active: rgba(0, 0, 0, 0.1);
+  --color-bg-toolbar: rgba(255, 255, 255, 0.8);
+  
+  /* 文字色 */
+  --color-text-primary: #1D1D1F;
+  --color-text-secondary: #6E6E73;
+  --color-text-muted: #86868B;
+  --color-text-inverse: #FFFFFF;
+  
+  /* 边框色 */
+  --color-border: rgba(0, 0, 0, 0.1);
+  --color-border-light: rgba(255, 255, 255, 0.6);
+  
+  /* 强调色 */
+  --color-accent: #007AFF;
+  --color-accent-hover: #0056B3;
+  --color-accent-light: rgba(0, 122, 255, 0.1);
+  
+  /* 状态色 */
+  --color-success: #28C840;
+  --color-warning: #FEBC2E;
+  --color-error: #FF5F57;
+  
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 20px 50px -12px rgba(0, 0, 0, 0.1);
+  
+  /* 交通灯按钮 */
+  --traffic-close: #FF5F57;
+  --traffic-close-border: #E0443E;
+  --traffic-minimize: #FEBC2E;
+  --traffic-minimize-border: #D89E24;
+  --traffic-maximize: #28C840;
+  --traffic-maximize-border: #1AAB29;
+}
+
+/* ========== 暗色主题 ========== */
+.dark {
+  --color-bg-primary: #0f0f12;
+  --color-bg-secondary: #1e1e1e;
+  --color-bg-sidebar: rgba(15, 23, 42, 0.6);
+  --color-bg-card: rgba(255, 255, 255, 0.1);
+  --color-bg-input: rgba(0, 0, 0, 0.2);
+  --color-bg-hover: rgba(255, 255, 255, 0.05);
+  --color-bg-active: rgba(255, 255, 255, 0.1);
+  --color-bg-toolbar: rgba(0, 0, 0, 0.6);
+  
+  --color-text-primary: #E2E8F0;
+  --color-text-secondary: #94A3B8;
+  --color-text-muted: #64748B;
+  --color-text-inverse: #0f0f12;
+  
+  --color-border: rgba(255, 255, 255, 0.05);
+  --color-border-light: rgba(255, 255, 255, 0.1);
+  
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 20px 50px -12px rgba(0, 0, 0, 0.5);
+}

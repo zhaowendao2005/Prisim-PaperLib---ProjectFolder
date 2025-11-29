@@ -1,11 +1,6 @@
 /**
  * 样式入口
- * 统一导入所有样式文件
+ * 仅定义 Tailwind 和主题导入
  */
-
-/* 主题变量 */
-/* @import './themes/light.css'; */
-/* @import './themes/dark.css'; */
-
-/* 基础样式 */
-/* @import './base.css'; */
+@import 'tailwindcss';
+@import './themes/variables.css';

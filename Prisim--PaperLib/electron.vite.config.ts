@@ -2,6 +2,7 @@ import { resolve } from 'path'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import vue from '@vitejs/plugin-vue'
 import tsconfigPaths from 'vite-tsconfig-paths'
+import tailwindcss from '@tailwindcss/vite'
 
 const rootDir = __dirname
 
@@ -34,6 +35,7 @@ export default defineConfig({
     },
     plugins: [
       vue(),
+      tailwindcss(),
       tsconfigPaths({
         root: rootDir,
         loose: true
