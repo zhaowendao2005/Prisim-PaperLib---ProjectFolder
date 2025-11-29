@@ -1,4 +1,8 @@
 {
+  // ============================================================
+  // ⚠️ 仅结构性配置 - 请勿在此添加 paths 或其他编译选项
+  // 所有配置统一在 tsconfig.json 中管理
+  // ============================================================
   "extends": ["@electron-toolkit/tsconfig/tsconfig.node.json", "./tsconfig.json"],
   "include": [
     "apps/electron/main/**/*",

@@ -1,3 +1,9 @@
+/**
+ * ============================================================
+ * ESLint 配置文件
+ * ⚠️ 路径别名规则请勿在此修改，统一在 tsconfig.json 中管理
+ * ============================================================
+ */
 import { defineConfig } from 'eslint/config'
 import eslint from '@eslint/js'
 import tseslint from 'typescript-eslint'

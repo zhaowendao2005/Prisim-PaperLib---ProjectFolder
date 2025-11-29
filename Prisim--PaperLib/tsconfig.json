@@ -1,6 +1,11 @@
 {
+  // ============================================================
+  // 🔒 唯一配置来源 - 所有 TypeScript 配置统一在此管理
+  // tsconfig.web.json 和 tsconfig.node.json 仅包含结构性内容
+  // ============================================================
   "compilerOptions": {
     "baseUrl": ".",
+    // ========== 路径别名 (唯一来源) ==========
     "paths": {
       "@/*": ["apps/client/src/*"],
       "@renderer/*": ["apps/client/src/renderer/*"],
@@ -8,7 +13,11 @@
       "@shared/*": ["apps/shared/*"],
       "@public/*": ["public/*"],
       "@assets/*": ["public/assets/*"],
-      "@resources/*": ["resources/*"]
+      "@resources/*": ["resources/*"],
+      "@views/*": ["apps/client/src/renderer/views/*"],
+      "@components/*": ["apps/client/src/renderer/components/*"],
+      "@stores/*": ["apps/client/src/renderer/stores/*"],
+      "@composables/*": ["apps/client/src/renderer/composables/*"]
     }
   },
   "files": [],
