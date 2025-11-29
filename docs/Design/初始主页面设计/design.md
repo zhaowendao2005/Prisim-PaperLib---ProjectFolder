@@ -85,13 +85,25 @@ composables/
 
 ## Stores 规划 (`@renderer/stores/`)
 
+按 DataSource 规范，每个 Store 模块包含：
+- `*.store.ts` - Pinia Store
+- `*.datasource.ts` - DataSource 接口定义
+- `*.mock.ts` - Mock 数据源实现（Web 调试）
+- `*.electron.ts` - Electron 数据源实现（生产）
+
 ```
 stores/
-├── paper/              # 论文状态管理
-│   ├── paper.store.ts
+├── paper/                      # 论文状态管理
+│   ├── paper.store.ts          # Pinia Store
+│   ├── paper.datasource.ts     # DataSource 接口
+│   ├── paper.mock.ts           # Mock 实现
+│   ├── paper.electron.ts       # Electron 实现
 │   └── index.ts
-├── ui/                 # UI状态管理
-│   ├── ui.store.ts
+├── ui/                         # UI状态管理
+│   ├── ui.store.ts             # Pinia Store
+│   ├── ui.datasource.ts        # DataSource 接口
+│   ├── ui.mock.ts              # Mock 实现
+│   ├── ui.electron.ts          # Electron 实现
 │   └── index.ts
 └── index.ts
 ```
