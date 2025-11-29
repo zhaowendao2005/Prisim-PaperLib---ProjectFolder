@@ -1,10 +1,12 @@
 <script setup lang="ts">
 /**
- * 顶部标题栏组件
+ * MainPage 顶部标题栏组件
+ * 基于公共 Titlebar 组件，添加页面特有的拖拽区域和工具栏
  */
 import { ref } from 'vue'
 
-const isMaximized = ref(false)
+import Titlebar from '@components/titlebar/index.vue'
+
 const isDark = ref(false)
 
 // 临时：selectedPaper 标题显示
@@ -12,14 +14,8 @@ const selectedPaperTitle = ref('Attention Is All You Need')
 </script>
 
 <template>
-  <header class="title-bar">
-    <!-- Traffic Lights -->
-    <div class="traffic-lights">
-      <button class="traffic-btn close"><span>×</span></button>
-      <button class="traffic-btn minimize"><span>-</span></button>
-      <button class="traffic-btn maximize" @click="isMaximized = !isMaximized"><span>⤢</span></button>
-    </div>
-
+  <!-- 不传回调，使用 Titlebar 默认的 window.api 调用 -->
+  <Titlebar>
     <!-- Title / Drag Area -->
     <div class="title-drag-area">
       <div class="title-pill">
@@ -48,67 +44,10 @@ const selectedPaperTitle = ref('Attention Is All You Need')
         </svg>
       </button>
     </div>
-  </header>
+  </Titlebar>
 </template>
 
 <style scoped>
-/* ========== Title Bar ========== */
-.title-bar {
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  user-select: none;
-  background-color: var(--color-bg-toolbar);
-  backdrop-filter: blur(12px);
-  z-index: 50;
-  transition: background-color 0.3s;
-}
-
-/* Traffic Lights */
-.traffic-lights {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 80px;
-  -webkit-app-region: no-drag;
-}
-
-.traffic-btn {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 1px solid;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: filter 0.15s;
-}
-.traffic-btn:hover { filter: brightness(0.9); }
-.traffic-btn span {
-  display: none;
-  font-size: 8px;
-  font-weight: bold;
-  color: rgba(0,0,0,0.5);
-}
-.traffic-btn:hover span { display: block; }
-
-.traffic-btn.close {
-  background-color: var(--traffic-close);
-  border-color: var(--traffic-close-border);
-}
-.traffic-btn.minimize {
-  background-color: var(--traffic-minimize);
-  border-color: var(--traffic-minimize-border);
-}
-.traffic-btn.maximize {
-  background-color: var(--traffic-maximize);
-  border-color: var(--traffic-maximize-border);
-}
-.traffic-btn.maximize span { font-size: 6px; }
-
 /* Title Drag Area */
 .title-drag-area {
   flex: 1;

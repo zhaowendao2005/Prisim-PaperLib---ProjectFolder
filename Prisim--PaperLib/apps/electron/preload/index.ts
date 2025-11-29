@@ -1,12 +1,12 @@
+/**
+ * Electron Preload 入口
+ * 通过 contextBridge 安全地暴露 API 给渲染进程
+ */
 import { contextBridge } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
+import { api } from './apis/api.aggregate'
 
-// Custom APIs for renderer
-const api = {}
-
-// Use `contextBridge` APIs to expose Electron APIs to
-// renderer only if context isolation is enabled, otherwise
-// just add to the DOM global.
+// 通过 contextBridge 暴露 API
 if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('electron', electronAPI)

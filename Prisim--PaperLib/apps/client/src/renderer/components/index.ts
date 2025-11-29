@@ -3,4 +3,4 @@
  * 存放可复用的 UI 组件
  */
 
-// 待重写
+export { default as Titlebar } from './titlebar/index.vue'
