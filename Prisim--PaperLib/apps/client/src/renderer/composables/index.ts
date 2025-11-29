@@ -3,5 +3,6 @@
  * 存放可复用的响应式逻辑（涉及 ref/watch/生命周期）
  */
 
+export { useAppLayout } from './app-layout'
 // export { useTheme } from './useTheme'
 // export { usePdfViewer } from './usePdfViewer'
