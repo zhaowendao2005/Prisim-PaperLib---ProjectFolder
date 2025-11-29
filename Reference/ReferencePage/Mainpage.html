@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PaperMind (Vue Edition)</title>
+    <!-- Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Noto+Serif:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .font-serif { font-family: 'Noto Serif', serif; }
+        
+        /* Custom Scrollbar to match macOS style */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: rgba(156, 163, 175, 0.3);
+            border-radius: 20px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background-color: rgba(156, 163, 175, 0.5);
+        }
+        
+        /* Hide scrollbar for clean look but allow scroll */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Drag region */
+        .drag-region { -webkit-app-region: drag; }
+        .no-drag { -webkit-app-region: no-drag; }
+    </style>
+</head>
+<body class="overflow-hidden">
+
+<div id="app" class="h-screen w-full flex flex-col overflow-hidden transition-colors duration-500" :class="isDark ? 'bg-[#0f0f12] text-slate-300' : 'bg-[#F5F5F7] text-slate-700'">
+
+    <!-- 1. Title Bar Component Instance -->
+    <title-bar 
+        :is-maximized="isMaximized" 
+        :is-dark="isDark" 
+        @toggle-maximized="isMaximized = !isMaximized"
+        @toggle-theme="isDark = !isDark">
+    </title-bar>
+
+    <!-- 2. Main Layout -->
+    <div class="flex flex-1 overflow-hidden pt-2 pb-3 px-3 gap-3">
+        
+        <!-- Left Sidebar: Library -->
+        <div class="w-64 flex flex-col rounded-2xl border backdrop-blur-xl shadow-sm transition-all duration-300"
+             :class="isDark ? 'bg-slate-900/60 border-white/5' : 'bg-white/70 border-white/60'">
+             
+             <!-- Search -->
+             <div class="p-4 pb-2">
+                <div class="flex items-center px-3 py-2 rounded-xl border transition-colors"
+                     :class="isDark ? 'bg-black/20 border-white/5 focus-within:bg-black/40' : 'bg-gray-100/50 border-transparent focus-within:bg-white focus-within:shadow-sm focus-within:border-blue-200'">
+                    <i data-lucide="search" class="w-3.5 h-3.5 text-gray-400 mr-2"></i>
+                    <input type="text" placeholder="Search..." class="bg-transparent border-none outline-none w-full text-xs placeholder-gray-400">
+                    <div class="flex items-center">
+                        <i data-lucide="command" class="w-2.5 h-2.5 text-gray-300 mr-0.5"></i>
+                        <span class="text-[10px] text-gray-300">K</span>
+                    </div>
+                </div>
+             </div>
+
+             <!-- Navigation -->
+             <div class="px-3 space-y-0.5 mb-4 select-none">
+                <div class="text-[10px] font-bold text-gray-400 px-3 py-2 uppercase tracking-wider">Library</div>
+                
+                <div class="flex items-center px-3 py-2 rounded-lg cursor-pointer transition-colors"
+                     :class="isDark ? 'bg-blue-600 text-white' : 'bg-slate-200/80 text-slate-900'">
+                    <i data-lucide="folder" class="w-4 h-4 mr-3"></i>
+                    <span class="font-medium text-xs">All Papers</span>
+                </div>
+                <div class="flex items-center px-3 py-2 rounded-lg cursor-pointer transition-colors"
+                     :class="isDark ? 'hover:bg-white/5 text-gray-400' : 'hover:bg-black/5 text-gray-500'">
+                    <i data-lucide="clock" class="w-4 h-4 mr-3"></i>
+                    <span class="text-xs">Recent</span>
+                </div>
+                <div class="flex items-center px-3 py-2 rounded-lg cursor-pointer transition-colors"
+                     :class="isDark ? 'hover:bg-white/5 text-gray-400' : 'hover:bg-black/5 text-gray-500'">
+                    <i data-lucide="cloud" class="w-4 h-4 mr-3"></i>
+                    <span class="text-xs">iCloud Drive</span>
+                </div>
+             </div>
+
+             <!-- Paper List -->
+             <div class="flex-1 overflow-y-auto px-3 space-y-2 custom-scrollbar pb-3">
+                <div class="text-[10px] font-bold text-gray-400 px-3 py-1 uppercase tracking-wider">Papers</div>
+                
+                <div v-for="paper in papers" :key="paper.id" 
+                     @click="selectedPaper = paper"
+                     class="group p-3 rounded-xl cursor-pointer transition-all duration-200 border relative"
+                     :class="[
+                        selectedPaper.id === paper.id 
+                            ? (isDark ? 'bg-white/10 border-white/10 shadow-lg' : 'bg-white border-white shadow-md shadow-gray-200/50') 
+                            : 'border-transparent hover:bg-black/5 dark:hover:bg-white/5'
+                     ]">
+                    
+                    <div v-if="selectedPaper.id === paper.id" class="absolute left-0 top-3 bottom-3 w-1 bg-blue-500 rounded-r-full"></div>
+                    
+                    <div class="font-semibold mb-1 truncate text-[13px]"
+                         :class="selectedPaper.id === paper.id ? 'text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-200'">
+                        {{ paper.title }}
+                    </div>
+                    <div class="flex justify-between items-center text-[11px] text-gray-400">
+                        <span>{{ paper.authors.split(' ')[0] }} et al.</span>
+                        <span class="px-2 py-0.5 rounded-md" :class="isDark ? 'bg-black/30' : 'bg-gray-100'">
+                            {{ paper.journal }}
+                        </span>
+                    </div>
+                </div>
+             </div>
+
+             <!-- User Profile -->
+             <div class="p-4 mx-3 mb-3 mt-2 rounded-xl flex items-center space-x-3 transition-colors"
+                  :class="isDark ? 'bg-white/5' : 'bg-white/50'">
+                <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-400 to-purple-400 shadow-inner"></div>
+                <div class="flex flex-col">
+                    <span class="text-xs font-semibold">Dr. User</span>
+                    <span class="text-[10px] opacity-50">Pro Plan</span>
+                </div>
+                <i data-lucide="settings" class="w-3.5 h-3.5 ml-auto opacity-50 hover:opacity-100 cursor-pointer"></i>
+             </div>
+        </div>
+
+        <!-- Middle: PDF Reader -->
+        <div class="flex-1 flex flex-col relative overflow-hidden rounded-2xl bg-transparent">
+             <!-- Floating Toolbar -->
+             <div class="absolute top-4 left-1/2 transform -translate-x-1/2 z-20 flex items-center space-x-1 px-2 py-1.5 rounded-full shadow-lg border backdrop-blur-md transition-all duration-300"
+                  :class="isDark ? 'bg-black/60 border-white/10 text-gray-200' : 'bg-white/80 border-white/50'">
+                
+                <button class="p-2 rounded-full transition-colors" :class="hoverClass"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
+                <span class="text-xs font-mono font-medium px-2 opacity-60">1 / 12</span>
+                <button class="p-2 rounded-full transition-colors" :class="hoverClass"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
+                
+                <div class="w-px h-4 mx-2" :class="isDark ? 'bg-gray-600' : 'bg-gray-300'"></div>
+                
+                <button @click="scale = Math.max(0.5, scale - 0.1)" class="p-2 rounded-full transition-colors" :class="hoverClass">
+                    <i data-lucide="zoom-out" class="w-4 h-4"></i>
+                </button>
+                <span class="text-xs w-8 text-center font-mono font-medium">{{ (scale * 100).toFixed(0) }}%</span>
+                <button @click="scale = Math.min(2.0, scale + 0.1)" class="p-2 rounded-full transition-colors" :class="hoverClass">
+                    <i data-lucide="zoom-in" class="w-4 h-4"></i>
+                </button>
+                
+                <div class="w-px h-4 mx-2" :class="isDark ? 'bg-gray-600' : 'bg-gray-300'"></div>
+                
+                <button class="p-2 rounded-full transition-colors" :class="hoverClass"><i data-lucide="highlighter" class="w-4 h-4"></i></button>
+             </div>
+
+             <!-- Reader Content -->
+             <div class="flex-1 overflow-y-auto px-4 pt-20 pb-10 text-center custom-scrollbar" id="pdf-container">
+                 <pdf-page v-for="page in [1,2,3]" 
+                           :key="page" 
+                           :page-num="page" 
+                           :scale="scale" 
+                           :content="selectedPaper" 
+                           :is-dark="isDark">
+                 </pdf-page>
+             </div>
+        </div>
+
+        <!-- Right Sidebar: Inspector -->
+        <div class="w-80 flex flex-col rounded-2xl border backdrop-blur-xl shadow-sm transition-all duration-300"
+             :class="isDark ? 'bg-slate-900/60 border-white/5' : 'bg-white/70 border-white/60'">
+             
+             <!-- Segmented Control -->
+             <div class="p-4 pb-2">
+                <div class="flex p-1 rounded-lg" :class="isDark ? 'bg-black/40' : 'bg-gray-200/60'">
+                    <button @click="rightTab = 'notes'" 
+                            class="flex-1 py-1.5 text-xs font-semibold rounded-md transition-all shadow-sm flex justify-center items-center"
+                            :class="rightTab === 'notes' ? (isDark ? 'bg-gray-700 text-white' : 'bg-white text-gray-800 shadow') : 'text-gray-500 hover:text-gray-700'">
+                        Notes
+                    </button>
+                    <button @click="rightTab = 'ai'" 
+                            class="flex-1 py-1.5 text-xs font-semibold rounded-md transition-all shadow-sm flex justify-center items-center"
+                            :class="rightTab === 'ai' ? (isDark ? 'bg-gray-700 text-white' : 'bg-white text-gray-800 shadow') : 'text-gray-500 hover:text-gray-700'">
+                        AI Assistant
+                    </button>
+                </div>
+             </div>
+
+             <!-- Tab Content -->
+             <div class="flex-1 overflow-y-auto p-4 pt-2 custom-scrollbar">
+                
+                <!-- Notes Tab -->
+                <div v-if="rightTab === 'notes'" class="h-full flex flex-col space-y-4">
+                    <div class="p-4 rounded-xl border space-y-2" :class="isDark ? 'bg-white/5 border-white/5' : 'bg-white border-white shadow-sm'">
+                        <div class="flex items-center space-x-2 mb-1">
+                            <div class="w-2 h-2 rounded-full bg-green-400"></div>
+                            <span class="text-xs font-bold uppercase tracking-wide text-gray-400">Metadata</span>
+                        </div>
+                        <div class="text-xs space-y-1.5">
+                            <div class="grid grid-cols-[60px_1fr]"><span class="text-gray-400">Journal</span> <span class="font-medium">{{ selectedPaper.journal }}</span></div>
+                            <div class="grid grid-cols-[60px_1fr]"><span class="text-gray-400">Year</span> <span class="font-medium">{{ selectedPaper.year }}</span></div>
+                        </div>
+                    </div>
+
+                    <div class="flex-1 flex flex-col">
+                        <div class="flex items-center justify-between mb-2 px-1">
+                            <span class="text-xs font-bold uppercase tracking-wide text-gray-400">Scratchpad</span>
+                            <i data-lucide="share-2" class="w-3 h-3 text-gray-400 cursor-pointer hover:text-blue-500"></i>
+                        </div>
+                        <textarea 
+                            class="flex-1 w-full p-4 rounded-xl resize-none outline-none text-sm leading-relaxed transition-colors border"
+                            :class="isDark ? 'bg-black/20 border-white/5 text-gray-300 placeholder-gray-600 focus:bg-black/40' : 'bg-yellow-50/50 border-yellow-100/50 text-gray-700 placeholder-gray-400 focus:bg-yellow-50 focus:shadow-inner'"
+                            placeholder="Write something..."># {{ selectedPaper.title }}
+
+This paper introduces the Transformer model.
+
+Key takeaways:
+- Self-attention mechanism
+- Parallelizable training</textarea>
+                    </div>
+                </div>
+
+                <!-- AI Tab -->
+                <div v-if="rightTab === 'ai'" class="h-full flex flex-col">
+                    <div class="flex-1 space-y-5">
+                        <div class="flex gap-3">
+                            <div class="w-8 h-8 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-purple-200 dark:shadow-none flex-shrink-0">
+                                <i data-lucide="bot" class="w-4 h-4"></i>
+                            </div>
+                            <div class="p-3.5 rounded-2xl rounded-tl-none text-xs leading-relaxed shadow-sm border"
+                                 :class="isDark ? 'bg-white/10 border-white/5 text-gray-200' : 'bg-white border-gray-100 text-gray-700'">
+                                I've read <strong>{{ selectedPaper.title }}</strong>.
+                                <div class="mt-2 flex gap-2">
+                                    <button class="px-2 py-1 rounded-md text-[10px] font-medium transition-colors" :class="buttonClass">Summarize</button>
+                                    <button class="px-2 py-1 rounded-md text-[10px] font-medium transition-colors" :class="buttonClass">Methods</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-3 flex-row-reverse">
+                            <div class="p-3.5 rounded-2xl rounded-tr-none text-xs leading-relaxed bg-blue-500 text-white shadow-lg shadow-blue-200 dark:shadow-none">
+                                What is the main contribution?
+                            </div>
+                        </div>
+
+                        <div class="flex gap-3">
+                            <div class="w-8 h-8 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-purple-200 dark:shadow-none flex-shrink-0">
+                                <i data-lucide="bot" class="w-4 h-4"></i>
+                            </div>
+                            <div class="p-3.5 rounded-2xl rounded-tl-none text-xs leading-relaxed shadow-sm border"
+                                 :class="isDark ? 'bg-white/10 border-white/5 text-gray-200' : 'bg-white border-gray-100 text-gray-700'">
+                                The main contribution is proposing a model architecture that eschews recurrence and relies entirely on attention.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 flex items-center p-2 pr-2 pl-4 rounded-full border shadow-sm transition-colors"
+                         :class="isDark ? 'bg-black/20 border-white/10 focus-within:bg-black/40' : 'bg-white border-gray-200 focus-within:border-blue-300 focus-within:ring-2 focus-within:ring-blue-100'">
+                        <input type="text" placeholder="Ask PaperMind..." class="flex-1 bg-transparent border-none outline-none text-xs">
+                        <button class="p-2 bg-slate-900 text-white rounded-full hover:bg-slate-700 transition-transform active:scale-95 flex items-center justify-center">
+                            <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </div>
+                </div>
+
+             </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- Templates for Components -->
+<!-- ========================================== -->
+
+<!-- Title Bar Template -->
+<template id="title-bar-template">
+    <div class="h-12 flex items-center justify-between select-none px-4 bg-opacity-80 backdrop-blur-md z-50 transition-colors duration-300"
+         :class="isDark ? 'bg-slate-900/80 text-white' : 'bg-white/80 text-slate-800'">
+        
+        <!-- Traffic Lights -->
+        <div class="flex items-center space-x-2 w-20 no-drag">
+            <div class="w-3 h-3 rounded-full bg-[#FF5F57] border border-[#E0443E] shadow-sm hover:brightness-90 cursor-pointer flex items-center justify-center group">
+                <span class="hidden group-hover:block text-[8px] text-black/50 font-bold">×</span>
+            </div>
+            <div class="w-3 h-3 rounded-full bg-[#FEBC2E] border border-[#D89E24] shadow-sm hover:brightness-90 cursor-pointer flex items-center justify-center group">
+                <span class="hidden group-hover:block text-[8px] text-black/50 font-bold">-</span>
+            </div>
+            <div @click="$emit('toggleMaximized')" class="w-3 h-3 rounded-full bg-[#28C840] border border-[#1AAB29] shadow-sm hover:brightness-90 cursor-pointer flex items-center justify-center group">
+                <span class="hidden group-hover:block text-[6px] text-black/50 font-bold">sw</span>
+            </div>
+        </div>
+
+        <!-- Title / Drag Area -->
+        <div class="flex-1 h-full flex items-center justify-center drag-region">
+            <div class="flex items-center space-x-2 px-3 py-1 rounded-md transition-colors" 
+                 :class="isDark ? 'bg-white/5' : 'bg-black/5'">
+                <i data-lucide="file-text" class="w-3.5 h-3.5 text-blue-500"></i>
+                <span class="font-medium text-xs tracking-wide">PaperMind</span>
+                <span class="text-[10px] opacity-40 mx-2"> — </span>
+                <span class="text-xs opacity-60 truncate max-w-[200px]">Attention Is All You Need.pdf</span>
+            </div>
+        </div>
+
+        <!-- Right Toolbar -->
+        <div class="flex items-center justify-end w-20 space-x-3 text-gray-400 no-drag">
+            <button @click="$emit('toggleTheme')" class="hover:text-gray-600 transition-colors">
+                <i v-if="isDark" data-lucide="sun" class="w-4 h-4"></i>
+                <i v-else data-lucide="moon" class="w-4 h-4"></i>
+            </button>
+            <button class="hover:text-gray-600 transition-colors">
+                <i data-lucide="layout" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </div>
+</template>
+
+<!-- PDF Page Template -->
+<template id="pdf-page-template">
+    <div class="relative mx-auto mb-10 transition-all duration-300 ease-out origin-top rounded-sm text-left"
+         :class="isDark ? 'bg-[#1e1e1e] text-gray-400 shadow-2xl shadow-black/50' : 'bg-white text-slate-800 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)]'"
+         :style="{ 
+            width: (595 * scale) + 'px', 
+            minHeight: (842 * scale) + 'px',
+            fontSize: (12 * scale) + 'px',
+            padding: (48 * scale) + 'px'
+         }">
+        
+         <div class="flex justify-between border-b pb-4 mb-6 border-gray-100 opacity-40 text-[0.7em] uppercase tracking-widest font-semibold">
+            <span>PaperMind Reader</span>
+            <span>Page {{ pageNum }}</span>
+        </div>
+        
+        <div class="space-y-6 text-justify leading-loose font-serif">
+            <h2 class="font-bold text-[1.8em] leading-tight" :class="isDark ? 'text-white/90' : 'text-black/90'">{{ content.title }}</h2>
+            <div class="text-[0.9em] italic text-blue-600/80 mb-8">{{ content.authors }} — {{ content.year }}</div>
+            
+            <div class="columns-2 gap-8 text-[0.95em]">
+                <p class="mb-6 first-letter:text-[3em] first-letter:font-bold first-letter:float-left first-letter:mr-3 first-letter:mt-[-10px]"
+                   :class="isDark ? 'first-letter:text-white/20' : 'first-letter:text-black/20'">
+                    {{ content.abstract }}
+                    The Transformer is the first transduction model relying entirely on self-attention to compute representations of its input and output without using sequence-aligned RNNs or convolution.
+                </p>
+                <p class="mb-6">
+                    In the following sections, we will describe the Transformer, motivate self-attention and discuss its advantages over models such as [17, 18] and [9].
+                </p>
+                <div class="p-6 my-6 border rounded-xl text-[0.85em] font-mono text-center break-words"
+                     :class="isDark ? 'bg-white/5 border-white/10' : 'bg-blue-50/50 border-blue-100'">
+                    <strong>Attention(Q, K, V)</strong><br/>
+                    = softmax(QK^T / √d_k)V
+                </div>
+                <p>
+                    Most competitive neural sequence transduction models have an encoder-decoder structure [5, 2, 35]. Here, the encoder maps an input sequence of symbol representations.
+                </p>
+            </div>
+        </div>
+    </div>
+</template>
+
+<script>
+    const { createApp, ref, computed, onMounted, onUpdated } = Vue;
+
+    // --- Sub Components ---
+    
+    const TitleBar = {
+        template: '#title-bar-template',
+        props: ['isMaximized', 'isDark'],
+        emits: ['toggleTheme', 'toggleMaximized']
+    };
+
+    const PdfPage = {
+        template: '#pdf-page-template',
+        props: ['pageNum', 'scale', 'content', 'isDark']
+    };
+
+    // --- Main App ---
+
+    const SAMPLE_PAPERS = [
+      {
+        id: 1,
+        title: "Attention Is All You Need",
+        authors: "Vaswani et al.",
+        year: 2017,
+        journal: "NIPS",
+        abstract: "The dominant sequence transduction models are based on complex recurrent or convolutional neural networks...",
+      },
+      {
+        id: 2,
+        title: "Deep Residual Learning for Image Recognition",
+        authors: "He et al.",
+        year: 2016,
+        journal: "CVPR",
+        abstract: "Deeper neural networks are more difficult to train. We present a residual learning framework...",
+      },
+      {
+        id: 3,
+        title: "BERT: Pre-training of Deep Bidirectional Transformers",
+        authors: "Devlin et al.",
+        year: 2019,
+        journal: "NAACL",
+        abstract: "We introduce a new language representation model called BERT, which stands for Bidirectional Encoder Representations...",
+      },
+      {
+        id: 4,
+        title: "Graph Attention Networks",
+        authors: "Veličković et al.",
+        year: 2018,
+        journal: "ICLR",
+        abstract: "We present graph attention networks (GATs), novel neural network architectures that operate on graph-structured data...",
+      }
+    ];
+
+    const App = {
+        components: {
+            'title-bar': TitleBar,
+            'pdf-page': PdfPage
+        },
+        setup() {
+            const papers = ref(SAMPLE_PAPERS);
+            const selectedPaper = ref(SAMPLE_PAPERS[0]);
+            const scale = ref(1.0);
+            const rightTab = ref('notes');
+            const isMaximized = ref(false);
+            const isDark = ref(false);
+
+            const hoverClass = computed(() => 
+                isDark.value ? 'hover:bg-white/10' : 'hover:bg-black/5'
+            );
+
+            const buttonClass = computed(() => 
+                isDark.value ? 'bg-white/10 hover:bg-white/20' : 'bg-gray-100 hover:bg-gray-200'
+            );
+
+            // Re-render icons when DOM updates
+            onMounted(() => {
+                lucide.createIcons();
+            });
+            onUpdated(() => {
+                lucide.createIcons();
+            });
+
+            return {
+                papers,
+                selectedPaper,
+                scale,
+                rightTab,
+                isMaximized,
+                isDark,
+                hoverClass,
+                buttonClass
+            };
+        }
+    };
+
+    createApp(App).mount('#app');
+</script>
+
+</body>
+</html>
