@@ -9,7 +9,7 @@ import { ref, computed } from 'vue'
 // ============================================================
 
 /** Tab 类型 */
-export type TabType = 'home' | 'project' | 'new-tab'
+export type TabType = 'home' | 'project' | 'new-tab' | 'settings'
 
 /** Tab 项定义 */
 export interface TabItem {

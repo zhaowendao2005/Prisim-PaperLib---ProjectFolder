@@ -10,6 +10,7 @@ import Tabbar from './tabbar/index.vue'
 import HomePage from './content/home-page/index.vue'
 import ProjectPage from './content/project-page/index.vue'
 import NewTabPage from './content/new-tab-page/index.vue'
+import SettingsPage from './content/settings-page/index.vue'
 
 const isDark = ref(false)
 const { activeTab } = useTabManager()
@@ -29,6 +30,7 @@ const { activeTab } = useTabManager()
       <HomePage v-if="activeTab?.type === 'home'" />
       <ProjectPage v-else-if="activeTab?.type === 'project'" />
       <NewTabPage v-else-if="activeTab?.type === 'new-tab'" />
+      <SettingsPage v-else-if="activeTab?.type === 'settings'" />
     </main>
   </div>
 </template>
