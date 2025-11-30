@@ -106,7 +106,8 @@ export default defineConfig(
       // 关闭过于严格的格式规则（交给 Prettier 处理）
       'vue/max-attributes-per-line': 'off',
       'vue/singleline-html-element-content-newline': 'off',
-      'vue/html-self-closing': 'off'
+      'vue/html-self-closing': 'off',
+      'vue/html-indent': 'off'
     }
   },
 

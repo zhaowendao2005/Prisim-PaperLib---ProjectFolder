@@ -199,54 +199,22 @@ onMounted(() => {
   background-color: rgba(0, 0, 0, 0.25);
 }
 
+/* 固定卡片尺寸 + auto-fill（类似 Windows 资源管理器） */
 .dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(auto-fill, 200px);
   gap: 16px;
-  min-width: 0;
 }
 
-/* 响应式：逐步减少列数 */
-@media (max-width: 1600px) {
-  .dashboard-grid {
-    grid-template-columns: repeat(5, 1fr);
-  }
-}
-
-@media (max-width: 1400px) {
-  .dashboard-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
-
-@media (max-width: 1100px) {
-  .dashboard-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-@media (max-width: 800px) {
-  .dashboard-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-/* 最小宽度限制：固定尺寸 + overflow */
-@media (max-width: 600px) {
-  .dashboard-grid {
-    grid-template-columns: repeat(2, 1fr);
-    min-width: 400px;
-  }
-}
-
-/* 项目卡片 */
+/* 项目卡片 - 固定尺寸 */
 .project-card {
+  width: 200px;
+  height: 160px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 20px 16px;
-  min-height: 140px;
+  padding: 16px;
   background-color: var(--color-bg-card);
   border: 1px solid var(--color-border-light);
   border-radius: 12px;
