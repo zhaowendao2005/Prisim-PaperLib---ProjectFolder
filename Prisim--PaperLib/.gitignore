@@ -9,3 +9,4 @@ Script/.log/
 # Build outputs
 electron.dist/
 app.dist/
+Prisim--PaperLib/.local-packages
