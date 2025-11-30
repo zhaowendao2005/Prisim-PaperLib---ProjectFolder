@@ -27,3 +27,6 @@ export type {
   ImportConfirmResult,
   LibraryApi
 } from './library/library.type'
+
+// Utils API
+export type { UtilsApi } from './utils/utils.type'

@@ -3,7 +3,7 @@
  * Home 页面 - 首页
  * 结构：左侧栏（垂直 navbar）+ 主面板 + 右侧栏（水平 navbar）
  */
-import { ref } from 'vue'
+import { ref, provide } from 'vue'
 
 import LeftSidebar from './homepage.left-sidebar/index.vue'
 import MainPanel from './homepage.main-panel/index.vue'
@@ -16,6 +16,12 @@ const rightSidebarWidth = ref(320)
 // 侧边栏折叠状态
 const leftCollapsed = ref(false)
 const rightCollapsed = ref(false)
+
+// 提供展开右侧栏的方法给子组件
+function expandRightSidebar() {
+  rightCollapsed.value = false
+}
+provide('expandRightSidebar', expandRightSidebar)
 
 // 拖拽调整宽度
 const isResizingLeft = ref(false)

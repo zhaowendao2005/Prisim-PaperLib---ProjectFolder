@@ -5,9 +5,11 @@
 import { windowApi } from './window/window.api'
 import { systemApi } from './system/system.api'
 import { libraryApi } from './library/library.api'
+import { utilsApi } from './utils/utils.api'
 
 export const api = {
   window: windowApi,
   system: systemApi,
-  library: libraryApi
+  library: libraryApi,
+  utils: utilsApi
 }

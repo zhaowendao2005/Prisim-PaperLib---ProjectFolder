@@ -3,7 +3,7 @@
  * 项目仪表盘 - 6列响应式网格
  * 显示项目/数据库/论文库卡片
  */
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, inject } from 'vue'
 import { useDataCardStore } from '@stores/home_datacard/home_datacard.store'
 import type { DataCard } from '@stores/home_datacard/home_datacard.datasource'
 import DropZone from '@/renderer/components/drop-zone/index.vue'
@@ -11,6 +11,9 @@ import CreateProjectDialog from '@/renderer/components/create-project-dialog/ind
 import { isElectron } from '@/core/utils/env'
 
 const store = useDataCardStore()
+
+// 注入展开右侧栏的方法
+const expandRightSidebar = inject<() => void>('expandRightSidebar')
 
 // 当前拖拽目标卡片 ID
 const dragTargetId = ref<string | null>(null)
@@ -26,31 +29,37 @@ function handleProjectCreated() {
   console.log('[ProjectDashboard] 项目创建成功')
 }
 
-// 右键选中卡片，显示概览
+// 右键选中卡片，显示概览并展开右侧栏
 function handleContextMenu(e: MouseEvent, card: DataCard) {
   e.preventDefault()
   store.selectCard(card)
+  // 展开右侧栏显示元数据
+  expandRightSidebar?.()
 }
 
 function formatDate(date: Date) {
   return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
 }
 
-// 处理文件拖放
+// 处理文件拖放（直接导入，不需要确认对话框，因为用户已明确选择目标库）
 async function handleFileDrop(files: File[], cardId: string) {
   if (!isElectron()) {
     console.log('[ProjectDashboard] Web 模式下不支持文件导入')
     return
   }
 
-  // 获取文件路径（Electron 环境下 File 对象有 path 属性）
-  const filePaths = files
-    .filter(f => f.name.toLowerCase().endsWith('.pdf'))
-    .map(f => (f as File & { path: string }).path)
-    .filter(Boolean)
+  // 过滤 PDF 文件并获取路径（使用 webUtils.getPathForFile）
+  const pdfFiles = files.filter(f => f.name.toLowerCase().endsWith('.pdf'))
+  if (pdfFiles.length === 0) {
+    console.log('[ProjectDashboard] 没有有效的 PDF 文件')
+    return
+  }
+
+  // 使用 preload API 获取文件路径
+  const filePaths = pdfFiles.map(f => window.api.utils.getPathForFile(f)).filter(Boolean)
 
   if (filePaths.length === 0) {
-    console.log('[ProjectDashboard] 没有有效的 PDF 文件')
+    console.log('[ProjectDashboard] 无法获取文件路径')
     return
   }
 
