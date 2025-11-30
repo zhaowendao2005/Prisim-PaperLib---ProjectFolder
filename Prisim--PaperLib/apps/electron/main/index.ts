@@ -3,14 +3,34 @@
  * 仅负责应用生命周期管理和模块初始化
  */
 import { app, BrowserWindow } from 'electron'
-import { electronApp, optimizer } from '@electron-toolkit/utils'
+import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { createMainWindow } from './services/window/window.service'
 import { registerAllIpcHandlers } from './ipc/ipc.register'
 
+/**
+ * 安装 Vue DevTools 扩展（仅开发环境）
+ */
+async function installDevTools(): Promise<void> {
+  if (!is.dev) return
+
+  try {
+    const { default: installExtension, VUEJS3_DEVTOOLS } = await import(
+      'electron-devtools-installer'
+    )
+    const name = await installExtension(VUEJS3_DEVTOOLS)
+    console.log(`[DevTools] ${name} 已安装`)
+  } catch (err) {
+    console.error('[DevTools] Vue DevTools 安装失败:', err)
+  }
+}
+
 // 应用就绪后初始化
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // 设置 Windows 应用模型 ID
   electronApp.setAppUserModelId('com.electron')
+
+  // 安装开发工具扩展
+  await installDevTools()
 
   // 开发环境快捷键优化
   app.on('browser-window-created', (_, window) => {
