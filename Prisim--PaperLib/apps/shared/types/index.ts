@@ -6,5 +6,8 @@
 // Window API
 export type { WindowApi } from './window/window.type'
 
-// Preload API
-export type { Api } from './api/api.type'
+// System API
+export type { SystemApi, AppConfig, AppPaths, ConfigKey } from './system/system.type'
+
+// IPC API（Client ↔ Electron 通信）
+export type { IpcApi } from './ipc-api/ipc-api.type'

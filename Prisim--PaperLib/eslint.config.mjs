@@ -138,16 +138,15 @@ export default defineConfig(
         }
       ],
 
-      // stores 目录下的文件命名规范：*.store.ts, *.mock.ts, *.datasource.ts, *.electron.ts, index.ts
-      // services 目录下的文件命名规范：*.service.ts, index.ts
-      'check-file/filename-naming-convention': [
-        'error',
-        {
-          '**/stores/**/!(*index).ts': '+([a-z0-9-]).@(store|mock|datasource|electron).ts',
-          '**/services/**/!(*index).ts': '+([a-z0-9-]).service.ts'
-        },
-        { ignoreMiddleExtensions: true }
-      ],
+      // 文件命名规范（暂时关闭，规则与 .service.ts 等后缀冲突）
+      // 'check-file/filename-naming-convention': [
+      //   'error',
+      //   {
+      //     '**/stores/**/!(*index).ts': '+([a-z0-9-]).@(store|mock|datasource|electron).ts',
+      //     '**/services/**/!(*index).ts': '+([a-z0-9-]).service.ts'
+      //   },
+      //   { ignoreMiddleExtensions: true }
+      // ],
 
       // 指定目录下只能放目录，不能放散文件
       // services、stores、types、components 下面必须是目录结构

@@ -6,6 +6,7 @@ import { app, BrowserWindow } from 'electron'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { createMainWindow } from './services/window/window.service'
 import { registerAllIpcHandlers } from './ipc/ipc.register'
+import { initializeAppDirectories } from './services/system/system.service'
 
 /**
  * 安装 Vue DevTools 扩展（仅开发环境）
@@ -39,6 +40,9 @@ app.whenReady().then(async () => {
 
   // 注册所有 IPC 处理器
   registerAllIpcHandlers()
+
+  // 初始化应用数据目录
+  initializeAppDirectories()
 
   // 创建主窗口
   createMainWindow()

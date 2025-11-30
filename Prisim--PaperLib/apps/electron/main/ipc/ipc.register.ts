@@ -4,6 +4,7 @@
  */
 import { ipcMain } from 'electron'
 import { registerWindowIpcHandlers } from './window/window.ipc'
+import { registerSystemIpcHandlers } from './system/system.ipc'
 
 /**
  * 注册所有 IPC 处理器
@@ -14,4 +15,7 @@ export function registerAllIpcHandlers(): void {
 
   // 窗口控制
   registerWindowIpcHandlers()
+
+  // 系统功能
+  registerSystemIpcHandlers()
 }
