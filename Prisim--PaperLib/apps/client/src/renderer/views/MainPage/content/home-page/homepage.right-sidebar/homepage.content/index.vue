@@ -5,13 +5,20 @@
  */
 import { ref, watch, computed } from 'vue'
 import { useDataCardStore } from '@stores/home_datacard/home_datacard.store'
+import { useLibraryMetaStore } from '@stores/library-meta/library-meta.store'
 import type { Paper } from '@stores/home_datacard/home_datacard.datasource'
+import { isElectron } from '@/core/utils/env'
 
 const store = useDataCardStore()
+const libraryMetaStore = isElectron() ? useLibraryMetaStore() : null
 
 // 当前选中卡片的论文列表
 const papers = ref<Paper[]>([])
 const loadingPapers = ref(false)
+
+// 删除确认对话框
+const showDeleteConfirm = ref(false)
+const deleting = ref(false)
 
 // 获取当前选中卡片的论文
 const currentPapers = computed(() => {
@@ -61,6 +68,33 @@ function formatFileSize(bytes: number | undefined) {
   if (!bytes) return ''
   const mb = bytes / (1024 * 1024)
   return mb < 1 ? `${(bytes / 1024).toFixed(0)} KB` : `${mb.toFixed(1)} MB`
+}
+
+// 删除数据库
+function handleDeleteClick() {
+  showDeleteConfirm.value = true
+}
+
+async function confirmDelete() {
+  if (!store.selectedCard || !libraryMetaStore) return
+  
+  deleting.value = true
+  try {
+    const cardId = store.selectedCard.id
+    // 清除选中状态
+    store.clearCardSelection()
+    // 删除数据库（同时删除文件）
+    await libraryMetaStore.removeDatabase(cardId, true)
+  } catch (e) {
+    console.error('[RightContent] 删除数据库失败:', e)
+  } finally {
+    deleting.value = false
+    showDeleteConfirm.value = false
+  }
+}
+
+function cancelDelete() {
+  showDeleteConfirm.value = false
 }
 </script>
 
@@ -150,6 +184,12 @@ function formatFileSize(bytes: number | undefined) {
             </svg>
             编辑
           </button>
+          <button class="action-btn danger" @click="handleDeleteClick">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            删除
+          </button>
         </div>
 
         <!-- 分隔线 -->
@@ -222,6 +262,34 @@ function formatFileSize(bytes: number | undefined) {
         <p class="empty-text">右键点击卡片查看概览</p>
       </div>
     </template>
+
+    <!-- 删除确认对话框 -->
+    <Teleport to="body">
+      <Transition name="fade">
+        <div v-if="showDeleteConfirm" class="delete-confirm-overlay" @click.self="cancelDelete">
+          <div class="delete-confirm-dialog">
+            <div class="dialog-icon">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h3 class="dialog-title">删除论文库</h3>
+            <p class="dialog-message">
+              确定要删除「{{ store.selectedCard?.name }}」吗？<br>
+              <span class="warning">此操作将永久删除所有论文文件，无法恢复。</span>
+            </p>
+            <div class="dialog-actions">
+              <button class="dialog-btn cancel" @click="cancelDelete" :disabled="deleting">
+                取消
+              </button>
+              <button class="dialog-btn confirm" @click="confirmDelete" :disabled="deleting">
+                {{ deleting ? '删除中...' : '确认删除' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -352,20 +420,21 @@ function formatFileSize(bytes: number | undefined) {
   color: var(--color-text-secondary);
 }
 
-/* 操作按钮 */
+/* 操作按钮 - 2列网格 */
 .actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 8px;
   margin-top: 4px;
 }
 
 .action-btn {
-  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
   padding: 10px 12px;
+  height: 40px;
   font-size: 13px;
   font-weight: 500;
   border: 1px solid var(--color-border-light);
@@ -617,5 +686,129 @@ function formatFileSize(bytes: number | undefined) {
 .papers-empty .hint {
   font-size: 11px;
   opacity: 0.7;
+}
+
+/* 删除按钮样式 */
+.action-btn.danger {
+  border-color: rgba(255, 59, 48, 0.3);
+  color: #FF3B30;
+}
+
+.action-btn.danger:hover {
+  border-color: #FF3B30;
+  background-color: rgba(255, 59, 48, 0.1);
+}
+
+/* 删除确认对话框 */
+.delete-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  backdrop-filter: blur(4px);
+}
+
+.delete-confirm-dialog {
+  background: var(--color-bg-card);
+  border-radius: 16px;
+  padding: 24px;
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+.dialog-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 59, 48, 0.1);
+  border-radius: 50%;
+  color: #FF3B30;
+}
+
+.dialog-icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.dialog-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.dialog-message {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  text-align: center;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.dialog-message .warning {
+  color: #FF3B30;
+  font-size: 13px;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  width: 100%;
+}
+
+.dialog-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.dialog-btn.cancel {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-light);
+  color: var(--color-text-secondary);
+}
+
+.dialog-btn.cancel:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+}
+
+.dialog-btn.confirm {
+  background: #FF3B30;
+  border: none;
+  color: white;
+}
+
+.dialog-btn.confirm:hover:not(:disabled) {
+  background: #E53528;
+}
+
+.dialog-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 对话框动画 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>

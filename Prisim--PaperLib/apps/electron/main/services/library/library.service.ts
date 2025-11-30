@@ -157,9 +157,25 @@ function saveTags(databasePath: string, tags: TagIndex): void {
 
 // ===== 数据库管理 =====
 
-/** 获取所有数据库 */
+/** 获取所有数据库（带校验，移除不存在的数据库） */
 export function getDatabases(): PaperDatabase[] {
-  return loadDatabasesConfig()
+  const databases = loadDatabasesConfig()
+  
+  // 校验每个数据库目录是否存在
+  const validDatabases = databases.filter(db => {
+    if (!existsSync(db.path)) {
+      console.log(`[Library] 数据库目录不存在，移除: ${db.name} (${db.path})`)
+      return false
+    }
+    return true
+  })
+  
+  // 如果有移除，保存更新后的配置
+  if (validDatabases.length !== databases.length) {
+    saveDatabasesConfig(validDatabases)
+  }
+  
+  return validDatabases
 }
 
 /** 创建数据库 */
