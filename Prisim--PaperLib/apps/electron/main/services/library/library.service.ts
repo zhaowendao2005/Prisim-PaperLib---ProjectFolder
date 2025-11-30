@@ -14,7 +14,7 @@ import type {
   FileChangeEvent
 } from '@client&electron.share/types/library/library.type'
 import { getPaths } from '../system/system.service'
-import * as watcherService from './watcher.service'
+// 注意：文件监听由 IPC 层（library.ipc.ts）独立管理
 
 // ===== 常量 =====
 
@@ -217,16 +217,13 @@ export function openDatabase(id: string): void {
 
   // 标记为已打开
   openedDatabases.set(id, db)
-
-  // 启动文件监听
-  watcherService.startWatching(id, db.name, db.path)
+  // 注意：文件监听由 IPC 层独立管理，不在此处启动
 }
 
 /** 关闭数据库 */
 export function closeDatabase(id: string): void {
   openedDatabases.delete(id)
-  // 停止文件监听
-  watcherService.stopWatching(id)
+  // 注意：文件监听由 IPC 层独立管理，不在此处停止
 }
 
 /** 删除数据库 */
@@ -307,6 +304,15 @@ export function importPapers(databaseId: string, filePaths: string[]): PaperMeta
     // 复制 PDF 文件
     const destPath = join(paperDir, filename)
     copyFileSync(filePath, destPath)
+
+    // 删除原文件（如果在 _imports 目录中）
+    if (filePath.includes(IMPORTS_DIR)) {
+      try {
+        unlinkSync(filePath)
+      } catch {
+        // 忽略删除失败
+      }
+    }
 
     // 创建元数据
     const now = Date.now()

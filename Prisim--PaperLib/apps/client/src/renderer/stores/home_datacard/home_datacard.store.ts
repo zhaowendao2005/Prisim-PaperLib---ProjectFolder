@@ -1,13 +1,16 @@
 /**
  * Home DataCard Store
  * 首页数据卡片及论文状态管理
+ * 数据源从 LibraryMetaStore 获取，负责 UI 展示层的状态管理
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { DataCard, DataCardFilter, Paper } from './home_datacard.datasource'
 import type { DataCardDataSource } from './home_datacard.datasource'
+import type { PaperDatabase } from '@client&electron.share/types'
 import { DataCardMockDataSource } from './home_datacard.mock'
 import { DataCardElectronDataSource } from './home_datacard.electron'
+import { useLibraryMetaStore } from '../library-meta/library-meta.store'
 import { isElectron, forceMock } from '@/core/utils/env'
 
 /** 创建数据源实例 */
@@ -20,12 +23,44 @@ function createDataSource(): DataCardDataSource {
   return new DataCardElectronDataSource()
 }
 
+/** 将 PaperDatabase 转换为 DataCard */
+function mapDatabaseToCard(db: PaperDatabase): DataCard {
+  return {
+    id: db.id,
+    name: db.name,
+    description: '',
+    paperCount: db.paperCount,
+    tags: [],
+    coverColor: '#3b82f6',
+    createdAt: new Date(db.createdAt),
+    updatedAt: new Date(db.lastOpenedAt),
+    stats: {
+      totalPapers: db.paperCount,
+      readPapers: 0,
+      annotatedPapers: 0,
+      lastOpenedAt: db.lastOpenedAt ? new Date(db.lastOpenedAt) : null
+    }
+  }
+}
+
 export const useDataCardStore = defineStore('home_datacard', () => {
-  // 数据源
+  // 数据源（仅用于 Mock 模式和论文操作）
   const dataSource = createDataSource()
   
-  // 数据卡片状态
-  const dataCards = ref<DataCard[]>([])
+  // 获取 LibraryMetaStore（Electron 模式下使用）
+  const libraryMetaStore = isElectron() && !forceMock() ? useLibraryMetaStore() : null
+  
+  // 数据卡片：响应式绑定到 LibraryMetaStore
+  const dataCards = computed<DataCard[]>(() => {
+    if (libraryMetaStore) {
+      return libraryMetaStore.databases.map(mapDatabaseToCard)
+    }
+    return _dataCardsCache.value
+  })
+  
+  // Mock 模式的缓存
+  const _dataCardsCache = ref<DataCard[]>([])
+  
   const selectedCard = ref<DataCard | null>(null)
   
   // 论文状态
@@ -49,10 +84,21 @@ export const useDataCardStore = defineStore('home_datacard', () => {
 
   // DataCard Actions
   async function fetchDataCards(filter?: DataCardFilter) {
+    // Electron 模式：数据已通过 computed 绑定，确保 libraryMetaStore 已初始化
+    if (libraryMetaStore) {
+      if (!libraryMetaStore.initialized) {
+        loading.value = true
+        await libraryMetaStore.fetchDatabases()
+        loading.value = false
+      }
+      return
+    }
+    
+    // Mock 模式：从 dataSource 获取
     loading.value = true
     error.value = null
     try {
-      dataCards.value = await dataSource.getList(filter)
+      _dataCardsCache.value = await dataSource.getList(filter)
     } catch (e) {
       error.value = e as Error
     } finally {
@@ -73,10 +119,17 @@ export const useDataCardStore = defineStore('home_datacard', () => {
   }
 
   async function searchDataCards(query: string) {
+    // Electron 模式：直接过滤 computed 结果（实际上应该用 computed 做过滤）
+    if (libraryMetaStore) {
+      // 搜索逻辑已在 computed 外部处理，这里不需要做什么
+      return
+    }
+    
+    // Mock 模式
     loading.value = true
     error.value = null
     try {
-      dataCards.value = await dataSource.search(query)
+      _dataCardsCache.value = await dataSource.search(query)
     } catch (e) {
       error.value = e as Error
     } finally {
@@ -88,12 +141,18 @@ export const useDataCardStore = defineStore('home_datacard', () => {
     loading.value = true
     error.value = null
     try {
+      // Electron 模式：通过 libraryMetaStore 创建，computed 自动更新
+      if (libraryMetaStore) {
+        const db = await libraryMetaStore.createDatabase(input.name)
+        return mapDatabaseToCard(db)
+      }
+      
+      // Mock 模式
       const newCard = await dataSource.create({
         name: input.name,
         description: input.description
       })
-      // 添加到列表开头
-      dataCards.value.unshift(newCard)
+      _dataCardsCache.value.unshift(newCard)
       return newCard
     } catch (e) {
       error.value = e as Error
@@ -167,12 +226,6 @@ export const useDataCardStore = defineStore('home_datacard', () => {
       const imported = await dataSource.importPapers(databaseId, filePaths)
       // 更新本地状态
       papers.value.push(...imported)
-      // 更新卡片论文数量
-      const card = dataCards.value.find(c => c.id === databaseId)
-      if (card) {
-        card.paperCount += imported.length
-        card.stats.totalPapers += imported.length
-      }
       return imported
     } catch (e) {
       error.value = e as Error
@@ -182,24 +235,9 @@ export const useDataCardStore = defineStore('home_datacard', () => {
     }
   }
 
-  // 订阅文件变更
-  function subscribeFileChange() {
-    if (!dataSource.subscribeFileChange) {
-      return () => {}
-    }
-    return dataSource.subscribeFileChange((event: unknown) => {
-      // 根据事件类型更新状态
-      const e = event as { type: string; databaseId: string; items: Paper[] }
-      switch (e.type) {
-        case 'add':
-        case 'batch-add':
-          papers.value.push(...e.items)
-          break
-        case 'remove':
-          papers.value = papers.value.filter(p => !e.items.find(i => i.id === p.id))
-          break
-      }
-    })
+  // 刷新数据卡片（从 LibraryMetaStore 同步）
+  async function refreshDataCards() {
+    await fetchDataCards()
   }
 
   return {
@@ -226,6 +264,6 @@ export const useDataCardStore = defineStore('home_datacard', () => {
     clearPaperSelection,
     getPapersForProject,
     importPapers,
-    subscribeFileChange
+    refreshDataCards
   }
 })

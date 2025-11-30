@@ -1,9 +1,10 @@
 /**
  * Home DataCard Electron 数据源
- * 调用 Electron IPC API 获取真实数据
+ * 从 LibraryMetaStore 获取数据，做兼容转换
  */
 import type { DataCardDataSource, DataCard, DataCardFilter, DataCardCreateInput, Paper } from './home_datacard.datasource'
-import type { PaperDatabase, PaperMeta, FileChangeEvent } from '@client&electron.share/types'
+import type { PaperDatabase, PaperMeta } from '@client&electron.share/types'
+import { useLibraryMetaStore } from '../library-meta/library-meta.store'
 
 /**
  * 将 PaperDatabase 转换为 DataCard
@@ -51,8 +52,14 @@ export class DataCardElectronDataSource implements DataCardDataSource {
   // ===== DataCard 操作 =====
 
   async getList(filter?: DataCardFilter): Promise<DataCard[]> {
-    const databases = await window.api.library.getDatabases()
-    let cards = databases.map(mapDatabaseToCard)
+    const libraryMetaStore = useLibraryMetaStore()
+    
+    // 等待初始化完成
+    if (!libraryMetaStore.initialized) {
+      await libraryMetaStore.fetchDatabases()
+    }
+    
+    let cards = libraryMetaStore.databases.map(mapDatabaseToCard)
 
     // 应用过滤
     if (filter?.tag) {
@@ -82,13 +89,14 @@ export class DataCardElectronDataSource implements DataCardDataSource {
   }
 
   async getById(id: string): Promise<DataCard | null> {
-    const databases = await window.api.library.getDatabases()
-    const db = databases.find(d => d.id === id)
+    const libraryMetaStore = useLibraryMetaStore()
+    const db = libraryMetaStore.getDatabaseById(id)
     return db ? mapDatabaseToCard(db) : null
   }
 
   async create(input: DataCardCreateInput): Promise<DataCard> {
-    const db = await window.api.library.createDatabase(input.name)
+    const libraryMetaStore = useLibraryMetaStore()
+    const db = await libraryMetaStore.createDatabase(input.name)
     return mapDatabaseToCard(db)
   }
 
@@ -106,25 +114,25 @@ export class DataCardElectronDataSource implements DataCardDataSource {
   }
 
   async delete(id: string): Promise<void> {
-    await window.api.library.removeDatabase(id, false)
+    const libraryMetaStore = useLibraryMetaStore()
+    await libraryMetaStore.removeDatabase(id, false)
   }
 
   async search(query: string): Promise<DataCard[]> {
-    const cards = await this.getList()
+    const libraryMetaStore = useLibraryMetaStore()
     const q = query.toLowerCase()
-    return cards.filter(c =>
-      c.name.toLowerCase().includes(q) ||
-      c.description.toLowerCase().includes(q)
-    )
+    return libraryMetaStore.databases
+      .filter(db => db.name.toLowerCase().includes(q))
+      .map(mapDatabaseToCard)
   }
 
   // ===== Paper 操作 =====
 
   async getAllPapers(): Promise<Paper[]> {
-    const databases = await window.api.library.getDatabases()
+    const libraryMetaStore = useLibraryMetaStore()
     const allPapers: Paper[] = []
 
-    for (const db of databases) {
+    for (const db of libraryMetaStore.databases) {
       const papers = await window.api.library.getPapers(db.id)
       allPapers.push(...papers.map(p => mapMetaToPaper(p, db.id)))
     }
@@ -138,9 +146,9 @@ export class DataCardElectronDataSource implements DataCardDataSource {
   }
 
   async getPaperById(id: string): Promise<Paper | null> {
-    const databases = await window.api.library.getDatabases()
+    const libraryMetaStore = useLibraryMetaStore()
 
-    for (const db of databases) {
+    for (const db of libraryMetaStore.databases) {
       const paper = await window.api.library.getPaper(db.id, id)
       if (paper) {
         return mapMetaToPaper(paper, db.id)
@@ -157,7 +165,5 @@ export class DataCardElectronDataSource implements DataCardDataSource {
     return imported.map(p => mapMetaToPaper(p, databaseId))
   }
 
-  subscribeFileChange(callback: (event: FileChangeEvent) => void): () => void {
-    return window.api.library.onFileChange(callback)
-  }
+  // 不再需要 subscribeFileChange，由 LibraryMetaStore 统一管理
 }

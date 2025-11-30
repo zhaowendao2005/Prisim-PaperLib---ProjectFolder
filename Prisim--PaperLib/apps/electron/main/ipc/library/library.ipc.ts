@@ -8,9 +8,39 @@ import * as watcherService from '../../services/library/watcher.service'
 import type { PaperMeta, Tag, FileChangeEvent } from '@client&electron.share/types/library/library.type'
 
 /**
+ * 初始化所有数据库的文件监听
+ * 独立于数据库创建，作为常态化服务运行
+ */
+function initializeWatchers(): void {
+  const databases = libraryService.getDatabases()
+  console.log(`[Library IPC] 初始化文件监听，数据库数量: ${databases.length}`)
+  
+  for (const db of databases) {
+    watcherService.startWatching(db.id, db.name, db.path)
+  }
+}
+
+/**
+ * 刷新监听状态（同步最新的数据库列表）
+ */
+function refreshWatchers(): void {
+  // 先停止所有监听
+  watcherService.stopAllWatching()
+  // 重新初始化
+  initializeWatchers()
+}
+
+/**
  * 注册 Library 相关的 IPC 处理器
  */
 export function registerLibraryIpcHandlers(): void {
+  // ===== 初始化：延迟启动文件监听，等待窗口准备就绪 =====
+  // 延迟 2 秒，确保渲染进程已加载并订阅了事件
+  setTimeout(() => {
+    console.log('[Library IPC] 延迟初始化文件监听...')
+    initializeWatchers()
+  }, 2000)
+
   // ===== 数据库管理 =====
 
   // 获取所有数据库
@@ -20,7 +50,10 @@ export function registerLibraryIpcHandlers(): void {
 
   // 创建数据库
   ipcMain.handle('library:createDatabase', (_event, name: string, path?: string) => {
-    return libraryService.createDatabase(name, path)
+    const db = libraryService.createDatabase(name, path)
+    // 刷新监听状态（解耦：不直接关联创建操作）
+    refreshWatchers()
+    return db
   })
 
   // 打开数据库
@@ -35,7 +68,10 @@ export function registerLibraryIpcHandlers(): void {
 
   // 删除数据库
   ipcMain.handle('library:removeDatabase', (_event, id: string, deleteFiles?: boolean) => {
-    return libraryService.removeDatabase(id, deleteFiles)
+    const result = libraryService.removeDatabase(id, deleteFiles)
+    // 刷新监听状态
+    refreshWatchers()
+    return result
   })
 
   // ===== 论文操作 =====

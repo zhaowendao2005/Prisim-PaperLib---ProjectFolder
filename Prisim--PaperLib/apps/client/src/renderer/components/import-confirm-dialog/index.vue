@@ -21,13 +21,12 @@ async function handleConfirm() {
   
   loading.value = true
   try {
-    // 通知主进程用户确认
-    await window.api.library.handleConfirmImport(true)
-    // 执行导入
-    await window.api.library.executeImport(
-      currentRequest.value.databaseId,
-      currentRequest.value.filePaths
-    )
+    // 转换为普通数组（避免 Proxy 序列化问题）
+    const databaseId = currentRequest.value.databaseId
+    const filePaths = [...currentRequest.value.filePaths]
+    await window.api.library.importPapers(databaseId, filePaths)
+  } catch (e) {
+    console.error('[ImportConfirmDialog] 导入失败:', e)
   } finally {
     loading.value = false
     visible.value = false
@@ -36,10 +35,7 @@ async function handleConfirm() {
 }
 
 // 处理取消
-async function handleCancel() {
-  if (!isElectron()) return
-  
-  await window.api.library.handleConfirmImport(false)
+function handleCancel() {
   visible.value = false
   currentRequest.value = null
 }
