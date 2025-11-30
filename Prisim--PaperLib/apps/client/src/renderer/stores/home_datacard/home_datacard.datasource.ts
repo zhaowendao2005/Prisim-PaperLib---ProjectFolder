@@ -82,4 +82,10 @@ export interface DataCardDataSource {
 
   /** 获取单篇论文 */
   getPaperById(id: string): Promise<Paper | null>
+
+  /** 导入论文到指定数据库 */
+  importPapers?(databaseId: string, filePaths: string[]): Promise<Paper[]>
+
+  /** 订阅文件变更事件 */
+  subscribeFileChange?(callback: (event: unknown) => void): () => void
 }

@@ -4,9 +4,11 @@
  */
 import type { WindowApi } from '../window/window.type'
 import type { SystemApi } from '../system/system.type'
+import type { LibraryApi } from '../library/library.type'
 
 /** IPC API 聚合类型（Client ↔ Electron 通信） */
 export interface IpcApi {
   window: WindowApi
   system: SystemApi
+  library: LibraryApi
 }

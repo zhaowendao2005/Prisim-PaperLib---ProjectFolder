@@ -11,3 +11,19 @@ export type { SystemApi, AppConfig, AppPaths, ConfigKey } from './system/system.
 
 // IPC API（Client ↔ Electron 通信）
 export type { IpcApi } from './ipc-api/ipc-api.type'
+
+// Library API（论文库系统）
+export type {
+  PaperDatabase,
+  DatabaseFilter,
+  DatabaseCreateInput,
+  PaperMeta,
+  PaperIndex,
+  Tag,
+  TagIndex,
+  FileChangeType,
+  FileChangeEvent,
+  ImportConfirmRequest,
+  ImportConfirmResult,
+  LibraryApi
+} from './library/library.type'

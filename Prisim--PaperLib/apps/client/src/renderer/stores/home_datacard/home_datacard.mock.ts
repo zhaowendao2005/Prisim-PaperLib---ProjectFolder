@@ -336,6 +336,19 @@ export class DataCardMockDataSource implements DataCardDataSource {
     return mockPapers.find(p => p.id === id) ?? null
   }
 
+  // 扩展方法（Mock 模式下的空实现）
+  async importPapers(_databaseId: string, filePaths: string[]): Promise<Paper[]> {
+    await this.delay(500)
+    console.log('[Mock] importPapers:', filePaths)
+    // Mock 模式下返回空数组
+    return []
+  }
+
+  subscribeFileChange(_callback: (event: unknown) => void): () => void {
+    // Mock 模式下不监听文件变更
+    return () => {}
+  }
+
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms))
   }

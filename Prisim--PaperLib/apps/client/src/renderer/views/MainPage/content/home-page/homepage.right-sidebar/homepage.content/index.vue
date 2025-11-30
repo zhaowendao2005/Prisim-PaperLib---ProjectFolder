@@ -1,11 +1,37 @@
 <script setup lang="ts">
 /**
  * HomePage 右侧栏 - 内容区
- * 显示选中数据卡片的概览信息
+ * 显示选中数据卡片的概览信息和论文列表
  */
+import { ref, watch, computed } from 'vue'
 import { useDataCardStore } from '@stores/home_datacard/home_datacard.store'
+import type { Paper } from '@stores/home_datacard/home_datacard.datasource'
 
 const store = useDataCardStore()
+
+// 当前选中卡片的论文列表
+const papers = ref<Paper[]>([])
+const loadingPapers = ref(false)
+
+// 获取当前选中卡片的论文
+const currentPapers = computed(() => {
+  if (!store.selectedCard) return []
+  return store.getPapersForProject(store.selectedCard.id)
+})
+
+// 监听选中卡片变化，加载论文
+watch(() => store.selectedCard, async (card) => {
+  if (!card) {
+    papers.value = []
+    return
+  }
+  loadingPapers.value = true
+  try {
+    await store.fetchPapersByProject(card.id)
+  } finally {
+    loadingPapers.value = false
+  }
+}, { immediate: true })
 
 function formatDate(date: Date | null) {
   if (!date) return '从未'
@@ -16,9 +42,25 @@ function formatDate(date: Date | null) {
   })
 }
 
+function formatShortDate(date: Date) {
+  return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
+}
+
 function getReadProgress(card: typeof store.selectedCard) {
   if (!card || card.stats.totalPapers === 0) return 0
   return Math.round((card.stats.readPapers / card.stats.totalPapers) * 100)
+}
+
+function formatAuthors(authors: string[]) {
+  if (authors.length === 0) return '未知作者'
+  if (authors.length <= 2) return authors.join(', ')
+  return `${authors[0]} 等`
+}
+
+function formatFileSize(bytes: number | undefined) {
+  if (!bytes) return ''
+  const mb = bytes / (1024 * 1024)
+  return mb < 1 ? `${(bytes / 1024).toFixed(0)} KB` : `${mb.toFixed(1)} MB`
 }
 </script>
 
@@ -108,6 +150,63 @@ function getReadProgress(card: typeof store.selectedCard) {
             </svg>
             编辑
           </button>
+        </div>
+
+        <!-- 分隔线 -->
+        <div class="divider" />
+
+        <!-- 论文列表 -->
+        <div class="papers-section">
+          <div class="section-header">
+            <h4 class="section-title">论文列表</h4>
+            <span class="paper-count">{{ currentPapers.length }} 篇</span>
+          </div>
+
+          <!-- 加载状态 -->
+          <div v-if="loadingPapers" class="papers-loading">
+            <div class="loading-spinner"></div>
+            <span>加载中...</span>
+          </div>
+
+          <!-- 论文列表 -->
+          <div v-else-if="currentPapers.length > 0" class="papers-list">
+            <div 
+              v-for="paper in currentPapers" 
+              :key="paper.id" 
+              class="paper-item"
+              :class="{ 'is-read': paper.isRead }"
+            >
+              <div class="paper-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                </svg>
+              </div>
+              <div class="paper-content">
+                <h5 class="paper-title">{{ paper.title }}</h5>
+                <div class="paper-meta">
+                  <span class="paper-authors">{{ formatAuthors(paper.authors) }}</span>
+                  <span v-if="paper.year" class="paper-year">{{ paper.year }}</span>
+                </div>
+                <div class="paper-footer">
+                  <span class="paper-date">{{ formatShortDate(paper.createdAt) }}</span>
+                  <div class="paper-badges">
+                    <span v-if="paper.isRead" class="badge read">已读</span>
+                    <span v-if="paper.isAnnotated" class="badge annotated">已标注</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 空状态 -->
+          <div v-else class="papers-empty">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            </svg>
+            <span>暂无论文</span>
+            <span class="hint">拖放 PDF 文件到卡片导入</span>
+          </div>
         </div>
       </div>
     </template>
@@ -328,5 +427,195 @@ function getReadProgress(card: typeof store.selectedCard) {
   color: var(--color-text-muted);
   text-align: center;
   margin: 0;
+}
+
+/* 论文列表区域 */
+.papers-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.paper-count {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+/* 加载状态 */
+.papers-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-border-light);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 论文列表 */
+.papers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.papers-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.papers-list::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 2px;
+}
+
+.paper-item {
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  background-color: var(--color-bg-secondary);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.paper-item:hover {
+  background-color: var(--color-bg-hover);
+}
+
+.paper-item.is-read {
+  opacity: 0.7;
+}
+
+.paper-icon {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-accent);
+}
+
+.paper-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.paper-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.paper-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  margin: 0;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.paper-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.paper-year {
+  color: var(--color-text-secondary);
+}
+
+.paper-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.paper-date {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.paper-badges {
+  display: flex;
+  gap: 4px;
+}
+
+.badge {
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 500;
+  border-radius: 4px;
+}
+
+.badge.read {
+  background-color: rgba(52, 199, 89, 0.15);
+  color: #34C759;
+}
+
+.badge.annotated {
+  background-color: rgba(255, 149, 0, 0.15);
+  color: #FF9500;
+}
+
+/* 空状态 */
+.papers-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px;
+  color: var(--color-text-muted);
+}
+
+.papers-empty svg {
+  width: 32px;
+  height: 32px;
+  opacity: 0.5;
+}
+
+.papers-empty span {
+  font-size: 13px;
+}
+
+.papers-empty .hint {
+  font-size: 11px;
+  opacity: 0.7;
 }
 </style>
