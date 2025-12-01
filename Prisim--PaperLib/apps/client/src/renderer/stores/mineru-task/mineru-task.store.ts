@@ -187,6 +187,26 @@ export const useMineruTaskStore = defineStore('mineru-task', () => {
     return taskList.value.filter(t => t.paperId === paperId)
   }
 
+  /**
+   * 清除所有任务缓存
+   */
+  async function clearTasksCache(): Promise<{ success: boolean; count: number }> {
+    if (!dataSource) {
+      return { success: false, count: 0 }
+    }
+
+    try {
+      const result = await dataSource.clearTasksCache()
+      if (result.success) {
+        tasks.value.clear()
+      }
+      return result
+    } catch (e) {
+      console.error('[MineruTaskStore] 清除缓存失败:', e)
+      return { success: false, count: 0 }
+    }
+  }
+
   // ===== 内部方法 =====
 
   /**
@@ -235,6 +255,7 @@ export const useMineruTaskStore = defineStore('mineru-task', () => {
     submitLocalOcrTask,
     downloadResult,
     testConnection,
+    clearTasksCache,
     getTask,
     getTasksForPaper,
     dispose

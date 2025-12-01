@@ -20,6 +20,9 @@ export interface IMineruTaskDataSource {
   /** 测试 API 连接 */
   testConnection(): Promise<{ success: boolean; message: string }>
 
+  /** 清除所有任务缓存 */
+  clearTasksCache(): Promise<{ success: boolean; count: number }>
+
   /** 订阅任务更新事件，返回取消订阅函数 */
   subscribeTaskUpdate(callback: (updates: MineruTask[]) => void): () => void
 }

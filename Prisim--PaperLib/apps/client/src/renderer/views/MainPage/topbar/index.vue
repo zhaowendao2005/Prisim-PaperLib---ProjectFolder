@@ -8,7 +8,7 @@ import { useTabManager } from '@composables/page-navigation'
 import { useMineruTaskStore } from '@/renderer/stores/mineru-task/mineru-task.store'
 
 import Titlebar from '@components/titlebar/index.vue'
-import ProgressDialog from '../progress-dialog/index.vue'
+import ProgressDialog from '../Dialog/progress-dialog/index.vue'
 
 const isDark = ref(false)
 const { activeTab } = useTabManager()
@@ -26,9 +26,6 @@ const selectedPaperTitle = ref('Attention Is All You Need')
 
 /** 进度对话框是否可见 */
 const progressDialogVisible = ref(false)
-
-/** 是否显示进度按钮（有任务时显示） */
-const showProgressButton = computed(() => mineruStore.globalProgress.total > 0)
 
 /** 是否有活跃任务 */
 const hasActiveTasks = computed(() => mineruStore.hasRunningTask)
@@ -59,11 +56,11 @@ function toggleProgressDialog(): void {
 
     <!-- Right Toolbar -->
     <div class="title-toolbar">
-      <!-- 进度按钮 -->
+      <!-- MinerU 进度按钮（始终显示） -->
       <button
-        v-if="showProgressButton"
         class="toolbar-btn progress-btn"
         :class="{ active: hasActiveTasks }"
+        title="MinerU OCR 任务"
         @click="toggleProgressDialog"
       >
         <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">

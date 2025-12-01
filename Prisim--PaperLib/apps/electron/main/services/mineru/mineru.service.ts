@@ -4,7 +4,7 @@
  */
 import { app, BrowserWindow } from 'electron'
 import { join } from 'path'
-import { existsSync, mkdirSync, writeFileSync, readFileSync, createWriteStream } from 'fs'
+import { existsSync, mkdirSync, writeFileSync, readFileSync, unlinkSync } from 'fs'
 import { randomUUID } from 'crypto'
 import type {
   MineruConfig,
@@ -109,10 +109,13 @@ async function mineruFetch<T>(
       data?: T
     }
 
-    if (json.code === '0' || json.code === 'ok') {
+    // 判断成功：code 为 "0"、"ok"、"200" 或数字 0/200
+    const successCodes = ['0', 'ok', '200', 0, 200]
+    if (successCodes.includes(json.code as string | number)) {
       return { success: true, data: json.data }
     } else {
-      return { success: false, error: json.msg, code: json.code }
+      console.warn('[MineruService] API 返回非成功码:', json.code, json.msg)
+      return { success: false, error: json.msg || `错误码: ${json.code}`, code: json.code }
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : '网络请求失败'
@@ -126,19 +129,34 @@ async function mineruFetch<T>(
  */
 async function uploadFileToUrl(filePath: string, uploadUrl: string): Promise<boolean> {
   try {
-    const fileBuffer = readFileSync(filePath)
+    console.log('[MinerU]   - 读取文件:', filePath)
     
+    // 检查文件是否存在
+    if (!existsSync(filePath)) {
+      console.log('[MinerU]   ✗ 文件不存在!')
+      return false
+    }
+    
+    const fileBuffer = readFileSync(filePath)
+    console.log('[MinerU]   - 文件大小:', (fileBuffer.length / 1024 / 1024).toFixed(2), 'MB')
+    
+    console.log('[MinerU]   - 开始上传到 OSS...')
+    // 注意：预签名 URL 上传不需要额外的 headers，否则会导致签名不匹配
     const response = await fetch(uploadUrl, {
       method: 'PUT',
-      body: fileBuffer,
-      headers: {
-        'Content-Type': 'application/pdf'
-      }
+      body: fileBuffer
     })
+
+    console.log('[MinerU]   - 上传响应状态:', response.status, response.statusText)
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.log('[MinerU]   - 上传错误响应:', errorText.substring(0, 500))
+    }
 
     return response.ok
   } catch (err) {
-    console.error('[MineruService] 文件上传失败:', err)
+    console.error('[MinerU] ✗ 文件上传异常:', err)
     return false
   }
 }
@@ -152,9 +170,17 @@ export async function submitLocalOcrTask(params: SubmitOcrTaskParams): Promise<M
   const { paperId, pdfPath, fileName } = params
   const config = getMineruConfig()
 
+  console.log('═══════════════════════════════════════════════════════')
+  console.log('[MinerU] 📤 开始提交 OCR 任务')
+  console.log('[MinerU] 阶段 0/4: 初始化任务')
+  console.log('[MinerU]   - paperId:', paperId)
+  console.log('[MinerU]   - fileName:', fileName)
+  console.log('[MinerU]   - pdfPath:', pdfPath)
+
   // 生成本地任务 ID
   const localId = randomUUID()
   const dataId = localId
+  console.log('[MinerU]   - localId:', localId)
 
   // 创建初始任务
   const task: MineruTask = {
@@ -172,8 +198,11 @@ export async function submitLocalOcrTask(params: SubmitOcrTaskParams): Promise<M
   // 加入任务表
   taskMap.set(localId, task)
   broadcastTaskUpdate([task])
+  console.log('[MinerU] ✓ 任务已加入队列，状态: uploading')
 
   // 1. 请求预签名上传 URL
+  console.log('───────────────────────────────────────────────────────')
+  console.log('[MinerU] 阶段 1/4: 请求预签名上传 URL')
   const fileUrlsResult = await mineruFetch<{
     batch_id: string
     file_urls: string[]
@@ -190,37 +219,58 @@ export async function submitLocalOcrTask(params: SubmitOcrTaskParams): Promise<M
   })
 
   if (!fileUrlsResult.success || !fileUrlsResult.data) {
+    console.log('[MinerU] ✗ 阶段 1 失败:', fileUrlsResult.error)
+    console.log('[MinerU]   - code:', fileUrlsResult.code)
+    console.log('═══════════════════════════════════════════════════════')
+    // 上传前失败，从任务表移除（不缓存）
     task.state = 'failed'
     task.errorMsg = fileUrlsResult.error ?? '获取上传 URL 失败'
     task.updatedAt = Date.now()
+    taskMap.delete(localId)
     broadcastTaskUpdate([task])
-    saveTasksCache()
     return task
   }
 
   const { batch_id, file_urls } = fileUrlsResult.data
   task.batchId = batch_id
+  console.log('[MinerU] ✓ 阶段 1 成功')
+  console.log('[MinerU]   - batch_id:', batch_id)
+  console.log('[MinerU]   - upload_url:', file_urls[0]?.substring(0, 80) + '...')
 
   // 2. 上传文件
+  console.log('───────────────────────────────────────────────────────')
+  console.log('[MinerU] 阶段 2/4: 上传 PDF 文件')
   const uploadSuccess = await uploadFileToUrl(pdfPath, file_urls[0])
   
   if (!uploadSuccess) {
+    console.log('[MinerU] ✗ 阶段 2 失败: 文件上传失败')
+    console.log('═══════════════════════════════════════════════════════')
+    // 文件上传失败，从任务表移除（不缓存）
     task.state = 'failed'
     task.errorMsg = '文件上传失败'
     task.updatedAt = Date.now()
+    taskMap.delete(localId)
     broadcastTaskUpdate([task])
-    saveTasksCache()
     return task
   }
 
+  console.log('[MinerU] ✓ 阶段 2 成功: 文件已上传')
+
   // 3. 上传成功，等待 MinerU 处理
+  console.log('───────────────────────────────────────────────────────')
+  console.log('[MinerU] 阶段 3/4: 等待 MinerU 后台处理')
   task.state = 'pending'
   task.updatedAt = Date.now()
   broadcastTaskUpdate([task])
   saveTasksCache()
+  console.log('[MinerU] ✓ 任务状态更新为: pending')
+  console.log('[MinerU] ✓ 任务已缓存到磁盘')
 
   // 启动轮询器（如果尚未启动）
   startPolling()
+  console.log('[MinerU] ✓ 轮询器已启动，间隔:', currentPollingIntervalMs / 1000, '秒')
+  console.log('[MinerU] 📋 阶段 4/4: 轮询进度（后台进行）')
+  console.log('═══════════════════════════════════════════════════════')
 
   return task
 }
@@ -242,6 +292,34 @@ export async function downloadResult(localId: string): Promise<void> {
   }
 
   await downloadResultZip(task)
+}
+
+/**
+ * 清除所有任务缓存
+ */
+export function clearTasksCache(): { success: boolean; count: number } {
+  try {
+    const count = taskMap.size
+    taskMap.clear()
+    
+    // 删除缓存文件
+    const cachePath = getTasksCachePath()
+    if (existsSync(cachePath)) {
+      unlinkSync(cachePath)
+    }
+    
+    // 停止轮询
+    stopPolling()
+    
+    // 广播清空
+    broadcastTaskUpdate([])
+    
+    console.log('[MineruService] 任务缓存已清除，共', count, '个任务')
+    return { success: true, count }
+  } catch (err) {
+    console.error('[MineruService] 清除任务缓存失败:', err)
+    return { success: false, count: 0 }
+  }
 }
 
 /**
@@ -326,6 +404,9 @@ function stopPolling(): void {
  * 轮询所有活跃批次
  */
 async function pollActiveBatches(): Promise<void> {
+  console.log('───────────────────────────────────────────────────────')
+  console.log('[MinerU] 🔄 轮询任务状态...')
+  
   // 收集活跃的 batchId
   const activeBatchIds = new Set<string>()
   for (const task of taskMap.values()) {
@@ -359,9 +440,26 @@ async function pollActiveBatches(): Promise<void> {
     }>(`/extract-results/batch/${batchId}`)
 
     if (!result.success || !result.data) {
-      console.warn('[MineruService] 轮询批次失败:', batchId, result.error)
+      console.log('[MinerU] ✗ 轮询失败')
+      console.log('[MinerU]   - batch_id:', batchId)
+      console.log('[MinerU]   - error:', result.error)
+      console.log('[MinerU]   - code:', result.code)
+      // 如果轮询失败，标记该批次所有任务为失败
+      for (const task of taskMap.values()) {
+        if (task.batchId === batchId && (task.state === 'pending' || task.state === 'running')) {
+          task.state = 'failed'
+          task.errorMsg = result.error || '轮询状态失败'
+          task.updatedAt = Date.now()
+          updatedTasks.push(task)
+          console.log('[MinerU]   - 任务已标记为失败:', task.fileName)
+        }
+      }
       continue
     }
+
+    console.log('[MinerU] ✓ 轮询响应')
+    console.log('[MinerU]   - batch_id:', batchId)
+    console.log('[MinerU]   - extract_result:', JSON.stringify(result.data.extract_result, null, 2))
 
     // 更新对应任务
     for (const extractResult of result.data.extract_result) {
@@ -379,17 +477,26 @@ async function pollActiveBatches(): Promise<void> {
       const mineruState = extractResult.state.toLowerCase()
       let newState: MineruTaskState = task.state
 
+      console.log('[MinerU] 📊 任务状态更新')
+      console.log('[MinerU]   - fileName:', task.fileName)
+      console.log('[MinerU]   - MinerU state:', extractResult.state, '(原始)')
+      console.log('[MinerU]   - 当前本地状态:', task.state)
+
       if (mineruState === 'running' || mineruState === 'processing') {
         newState = 'running'
       } else if (mineruState === 'done' || mineruState === 'success') {
         newState = 'done'
       } else if (mineruState === 'failed' || mineruState === 'error') {
         newState = 'failed'
-      } else if (mineruState === 'pending' || mineruState === 'waiting') {
+      } else if (mineruState === 'pending' || mineruState === 'waiting' || mineruState === 'waiting-file') {
+        // waiting-file: 文件已上传，等待 MinerU 开始处理
         newState = 'pending'
+      } else {
+        console.log('[MinerU]   ⚠️ 未知状态，保持不变:', mineruState)
       }
 
       if (newState !== task.state) {
+        console.log('[MinerU]   - 状态变化:', task.state, '->', newState)
         task.state = newState
         stateChanged = true
       }
@@ -403,29 +510,36 @@ async function pollActiveBatches(): Promise<void> {
         }
         task.progress = progress
         stateChanged = true
+        console.log('[MinerU]   - 进度:', progress.extractedPages, '/', progress.totalPages, '页')
       }
 
       // 更新结果 URL
       if (extractResult.full_zip_url && !task.resultZipUrl) {
         task.resultZipUrl = extractResult.full_zip_url
         stateChanged = true
+        console.log('[MinerU]   - 结果 URL:', extractResult.full_zip_url.substring(0, 60) + '...')
       }
 
       // 更新错误信息
       if (extractResult.err_msg && !task.errorMsg) {
         task.errorMsg = extractResult.err_msg
         stateChanged = true
+        console.log('[MinerU]   - 错误信息:', extractResult.err_msg)
       }
 
       if (stateChanged) {
         task.updatedAt = Date.now()
         updatedTasks.push(task)
+        console.log('[MinerU]   ✓ 任务已更新')
+      } else {
+        console.log('[MinerU]   - 无变化')
       }
 
       // 如果任务完成且有结果 URL，自动下载
       if (task.state === 'done' && task.resultZipUrl && !task.resultLocalPath) {
+        console.log('[MinerU] 📥 开始自动下载结果...')
         downloadResultZip(task).catch(err => {
-          console.error('[MineruService] 自动下载结果失败:', err)
+          console.error('[MinerU] ✗ 自动下载结果失败:', err)
         })
       }
     }
@@ -499,10 +613,12 @@ function getTasksCachePath(): string {
 
 /**
  * 保存任务缓存
+ * 只缓存已成功提交到后端的任务（有 batchId 的）
  */
 function saveTasksCache(): void {
   try {
-    const tasks = Array.from(taskMap.values())
+    // 只保存有 batchId 的任务（已成功提交到 MinerU 后端）
+    const tasks = Array.from(taskMap.values()).filter(t => t.batchId)
     const cachePath = getTasksCachePath()
     writeFileSync(cachePath, JSON.stringify(tasks, null, 2), 'utf-8')
   } catch (err) {

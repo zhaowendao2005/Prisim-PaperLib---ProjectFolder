@@ -30,5 +30,10 @@ export function registerMineruIpcHandlers(): void {
     return await MineruService.testConnection()
   })
 
+  // 清除任务缓存
+  ipcMain.handle('mineru:clearTasksCache', () => {
+    return MineruService.clearTasksCache()
+  })
+
   console.log('[MineruIPC] IPC 处理器注册完成')
 }

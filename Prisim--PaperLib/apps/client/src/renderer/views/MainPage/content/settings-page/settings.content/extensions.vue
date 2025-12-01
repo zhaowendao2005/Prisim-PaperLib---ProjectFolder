@@ -92,7 +92,9 @@ async function saveConfig(): Promise<void> {
     // 验证轮询间隔
     formData.value.pollingIntervalSec = Math.max(5, Math.min(60, formData.value.pollingIntervalSec))
 
-    await window.api.system.setConfigValue('extensions.mineru', formData.value)
+    // 转换为纯对象以避免 IPC 序列化 Proxy 失败
+    const plainConfig = JSON.parse(JSON.stringify(formData.value))
+    await window.api.system.setConfigValue('extensions.mineru', plainConfig)
     originalConfig.value = { ...formData.value }
     testResult.value = null
   } catch (e) {
@@ -123,6 +125,35 @@ async function testConnection(): Promise<void> {
 /** 重置为默认值 */
 function resetToDefault(): void {
   formData.value = { ...DEFAULT_MINERU_CONFIG }
+}
+
+// ===== 清除任务缓存 =====
+
+const clearingTasks = ref(false)
+const clearTasksMsg = ref<{ type: 'success' | 'error'; text: string } | null>(null)
+
+async function clearMineruTasks(): Promise<void> {
+  if (clearingTasks.value) return
+
+  const confirmed = confirm('确定要清除所有 MinerU OCR 任务记录吗？\n\n此操作不可撤销。')
+  if (!confirmed) return
+
+  clearingTasks.value = true
+  clearTasksMsg.value = null
+
+  try {
+    const result = await mineruStore.clearTasksCache()
+    if (result.success) {
+      clearTasksMsg.value = { type: 'success', text: `已清除 ${result.count} 个任务记录` }
+    } else {
+      clearTasksMsg.value = { type: 'error', text: '清除失败' }
+    }
+    setTimeout(() => { clearTasksMsg.value = null }, 3000)
+  } catch (e) {
+    clearTasksMsg.value = { type: 'error', text: '清除失败' }
+  } finally {
+    clearingTasks.value = false
+  }
 }
 
 // ===== 生命周期 =====
@@ -280,6 +311,31 @@ watch(() => formData.value.apiKey, () => {
             >
               {{ saving ? '保存中...' : '保存' }}
             </button>
+          </div>
+
+          <!-- 分隔线 -->
+          <div class="divider" />
+
+          <!-- 任务管理 -->
+          <div class="form-group">
+            <label class="form-label">任务缓存</label>
+            <div class="task-cache-row">
+              <span class="task-cache-desc">清除所有 MinerU OCR 任务记录</span>
+              <button
+                class="btn-danger-small"
+                :disabled="clearingTasks"
+                @click="clearMineruTasks"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+                {{ clearingTasks ? '清除中...' : '清除' }}
+              </button>
+            </div>
+            <div v-if="clearTasksMsg" class="cache-msg" :class="clearTasksMsg.type">
+              {{ clearTasksMsg.text }}
+            </div>
           </div>
         </template>
       </div>
@@ -562,5 +618,72 @@ watch(() => formData.value.apiKey, () => {
 
 .btn-text:hover {
   color: var(--color-text-primary);
+}
+
+/* 分隔线 */
+.divider {
+  height: 1px;
+  background: rgba(0, 0, 0, 0.06);
+  margin: 20px 0;
+}
+
+/* 任务缓存 */
+.task-cache-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.task-cache-desc {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.btn-danger-small {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #dc2626;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-danger-small:hover:not(:disabled) {
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
+.btn-danger-small:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-danger-small svg {
+  width: 12px;
+  height: 12px;
+}
+
+.cache-msg {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.cache-msg.success {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.cache-msg.error {
+  background: #fee2e2;
+  color: #991b1b;
 }
 </style>

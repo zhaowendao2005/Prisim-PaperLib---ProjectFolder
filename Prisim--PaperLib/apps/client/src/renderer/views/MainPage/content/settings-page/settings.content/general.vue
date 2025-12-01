@@ -2,8 +2,11 @@
 /**
  * 设置页面 - 通用设置
  */
-import { reactive, onMounted } from 'vue'
+import { reactive, ref, onMounted } from 'vue'
 import type { AppConfig } from '@client&electron.share/types'
+import { useMineruTaskStore } from '@stores/mineru-task/mineru-task.store'
+
+const mineruStore = useMineruTaskStore()
 
 // 设置状态
 const settings = reactive({
@@ -128,6 +131,75 @@ async function updateOpenLastPaper(value: boolean) {
 async function updateAutoCheckUpdate(value: boolean) {
   settings.autoCheckUpdate = value
   await window.api.system.setConfigValue('startup.autoCheckUpdate', value)
+}
+
+// ===== 缓存管理 =====
+
+/** 清除缓存状态 */
+const clearingCache = ref(false)
+const cacheMessage = ref<{ type: 'success' | 'error'; text: string } | null>(null)
+
+/** 清除所有浏览器缓存（localStorage + IndexedDB） */
+async function clearAllCache() {
+  if (clearingCache.value) return
+
+  // 确认对话框
+  const confirmed = confirm('确定要清除所有本地缓存吗？\n\n这将删除：\n• 所有 LocalStorage 数据\n• 所有 IndexedDB 数据库\n\n此操作不可撤销，但不会影响论文文件。')
+  if (!confirmed) return
+
+  clearingCache.value = true
+  cacheMessage.value = null
+
+  try {
+    // 1. 清除 localStorage
+    localStorage.clear()
+    console.log('[Settings] LocalStorage 已清除')
+
+    // 2. 清除所有 IndexedDB 数据库
+    const databases = await indexedDB.databases()
+    const deletePromises = databases.map(db => {
+      return new Promise<void>((resolve, reject) => {
+        if (!db.name) {
+          resolve()
+          return
+        }
+        const request = indexedDB.deleteDatabase(db.name)
+        request.onsuccess = () => {
+          console.log(`[Settings] IndexedDB "${db.name}" 已删除`)
+          resolve()
+        }
+        request.onerror = () => reject(request.error)
+        request.onblocked = () => {
+          console.warn(`[Settings] IndexedDB "${db.name}" 删除被阻塞`)
+          resolve() // 不阻断流程
+        }
+      })
+    })
+    await Promise.all(deletePromises)
+
+    // 3. 清除 MinerU 任务缓存
+    let mineruCount = 0
+    try {
+      const mineruResult = await mineruStore.clearTasksCache()
+      mineruCount = mineruResult.count
+      console.log('[Settings] MinerU 任务缓存已清除:', mineruCount, '个')
+    } catch (err) {
+      console.warn('[Settings] 清除 MinerU 任务缓存失败:', err)
+    }
+
+    cacheMessage.value = { 
+      type: 'success', 
+      text: `已清除 LocalStorage、${databases.length} 个 IndexedDB 数据库${mineruCount > 0 ? `、${mineruCount} 个 MinerU 任务` : ''}` 
+    }
+    
+    // 3秒后清除消息
+    setTimeout(() => { cacheMessage.value = null }, 3000)
+  } catch (error) {
+    console.error('[Settings] 清除缓存失败:', error)
+    cacheMessage.value = { type: 'error', text: '清除缓存失败' }
+  } finally {
+    clearingCache.value = false
+  }
 }
 
 // 组件挂载时加载配置
@@ -265,6 +337,36 @@ onMounted(() => {
               <div class="switch-handle" />
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 缓存管理 -->
+    <div class="setting-group">
+      <div class="group-title">缓存管理</div>
+      <div class="group-container">
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">清除本地缓存</div>
+            <div class="setting-desc">删除所有 LocalStorage 和 IndexedDB 数据（不影响论文文件）</div>
+          </div>
+          <div class="setting-control">
+            <button 
+              class="btn-danger" 
+              :disabled="clearingCache"
+              @click="clearAllCache"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+              {{ clearingCache ? '清除中...' : '清除缓存' }}
+            </button>
+          </div>
+        </div>
+        <!-- 操作结果消息 -->
+        <div v-if="cacheMessage" class="cache-message" :class="cacheMessage.type">
+          {{ cacheMessage.text }}
         </div>
       </div>
     </div>
@@ -512,5 +614,53 @@ onMounted(() => {
   color: #9ca3af;
   width: 14px;
   height: 14px;
+}
+
+/* 危险按钮 */
+.btn-danger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #dc2626;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
+.btn-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-danger svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* 缓存消息 */
+.cache-message {
+  padding: 10px 16px;
+  font-size: 12px;
+  border-top: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.cache-message.success {
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.cache-message.error {
+  background: #fef2f2;
+  color: #991b1b;
 }
 </style>

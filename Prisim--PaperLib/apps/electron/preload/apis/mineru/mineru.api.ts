@@ -22,6 +22,10 @@ export const mineruApi: MineruApi = {
   testConnection: () => 
     ipcRenderer.invoke('mineru:testConnection') as Promise<{ success: boolean; message: string }>,
 
+  /** 清除任务缓存 */
+  clearTasksCache: () => 
+    ipcRenderer.invoke('mineru:clearTasksCache') as Promise<{ success: boolean; count: number }>,
+
   /** 订阅任务更新事件 */
   onTaskUpdate: (callback: (updates: MineruTask[]) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, updates: MineruTask[]) => {

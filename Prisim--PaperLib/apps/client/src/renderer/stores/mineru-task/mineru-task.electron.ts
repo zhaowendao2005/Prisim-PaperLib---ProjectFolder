@@ -26,6 +26,11 @@ export class MineruTaskElectronDataSource implements IMineruTaskDataSource {
     return window.api.mineru.testConnection()
   }
 
+  /** 清除所有任务缓存 */
+  async clearTasksCache(): Promise<{ success: boolean; count: number }> {
+    return window.api.mineru.clearTasksCache()
+  }
+
   /** 订阅任务更新事件 */
   subscribeTaskUpdate(callback: (updates: MineruTask[]) => void): () => void {
     return window.api.mineru.onTaskUpdate(callback)
