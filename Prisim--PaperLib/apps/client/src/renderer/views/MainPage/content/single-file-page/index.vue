@@ -54,6 +54,19 @@ watch(
   { immediate: true }
 )
 
+// 监听 store 的 zoomLevel 变化,同步到 PDFViewer
+watch(
+  () => readerState.value?.zoomLevel,
+  (zoomLevel) => {
+    if (pdfViewer.value && zoomLevel !== undefined) {
+      // 只有当 PDFViewer 的 scale 和 store 不同时才更新
+      if (Math.abs(pdfViewer.value.currentScale - zoomLevel) > 0.001) {
+        pdfViewer.value.currentScale = zoomLevel
+      }
+    }
+  }
+)
+
 /**
  * 初始化 PDF Viewer
  */
@@ -90,7 +103,7 @@ function initPDFViewer() {
  * 设置滚轮缩放
  */
 function setupWheelZoom() {
-  if (!viewerContainerRef.value || !pdfViewer.value) return
+  if (!viewerContainerRef.value) return
   
   const container = viewerContainerRef.value
   
@@ -99,18 +112,24 @@ function setupWheelZoom() {
     if (evt.ctrlKey || evt.metaKey) {
       evt.preventDefault()
       
-      // 计算缩放方向
-      const delta = evt.deltaY
-      const ticks = delta > 0 ? -1 : 1
+      if (!readerState.value) return
       
-      // 使用 PDFViewer 的缩放方法
-      if (pdfViewer.value) {
-        if (ticks > 0) {
-          pdfViewer.value.increaseScale()
-        } else {
-          pdfViewer.value.decreaseScale()
-        }
-      }
+      // 获取当前缩放比例 (从 store)
+      const currentScale = readerState.value.zoomLevel
+      
+      // 计算缩放因子 (基于滚轮滚动量)
+      // deltaY > 0 表示向下滚动 = 缩小
+      // deltaY < 0 表示向上滚动 = 放大
+      const zoomFactor = evt.deltaY > 0 ? 0.9 : 1.1
+      
+      // 计算新的缩放比例
+      let newScale = currentScale * zoomFactor
+      
+      // 限制缩放范围 (0.25x - 4x)
+      newScale = Math.max(0.25, Math.min(4, newScale))
+      
+      // 更新 store (watch 会自动同步到 PDFViewer)
+      paperReaderStore.setZoomLevel(readerState.value.paperId, newScale)
     }
   }
   
