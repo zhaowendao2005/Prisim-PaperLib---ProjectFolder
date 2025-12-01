@@ -29,6 +29,11 @@ const pdfLinkService = shallowRef<PDFLinkService | null>(null)
 const renderError = ref<string | null>(null)
 const loadedPaperId = ref<string | null>(null)
 
+// PDF 文档缓存 (LRU,最多 5 个)
+const MAX_CACHE_SIZE = 5
+const pdfDocumentCache = new Map<string, pdfjsLib.PDFDocumentProxy>()
+const cacheAccessOrder: string[] = [] // 记录访问顺序,用于 LRU
+
 // 监听 pdfPath 变化,直接加载 PDF
 watch(
   () => readerState.value?.pdfPath,
@@ -121,6 +126,37 @@ function setupWheelZoom() {
 }
 
 /**
+ * 更新 LRU 缓存访问顺序
+ */
+function updateCacheAccess(pdfPath: string) {
+  // 移除旧的访问记录
+  const index = cacheAccessOrder.indexOf(pdfPath)
+  if (index > -1) {
+    cacheAccessOrder.splice(index, 1)
+  }
+  // 添加到最前面(最近访问)
+  cacheAccessOrder.unshift(pdfPath)
+}
+
+/**
+ * 清理最旧的缓存
+ */
+function evictOldestCache() {
+  if (pdfDocumentCache.size >= MAX_CACHE_SIZE) {
+    // 移除最久未访问的
+    const oldestPath = cacheAccessOrder.pop()
+    if (oldestPath) {
+      const doc = pdfDocumentCache.get(oldestPath)
+      if (doc) {
+        doc.destroy() // 释放资源
+        pdfDocumentCache.delete(oldestPath)
+        console.log('[PDF Cache] 清理缓存:', oldestPath)
+      }
+    }
+  }
+}
+
+/**
  * 从路径加载 PDF
  */
 async function loadPDFFromPath(pdfPath: string) {
@@ -128,15 +164,32 @@ async function loadPDFFromPath(pdfPath: string) {
     console.log('[PDF] 从路径加载 PDF:', pdfPath)
     renderError.value = null
     
-    // 通过 IPC 读取 PDF 文件
-    const arrayBuffer = await window.api.pdf.readPDF(pdfPath)
-    console.log('[PDF] PDF 数据读取成功:', arrayBuffer.byteLength, 'bytes')
+    let pdfDocument: pdfjsLib.PDFDocumentProxy
     
-    // 加载 PDF 文档
-    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer })
-    const pdfDocument = await loadingTask.promise
-    
-    console.log('[PDF] 文档加载成功,总页数:', pdfDocument.numPages)
+    // 检查缓存
+    if (pdfDocumentCache.has(pdfPath)) {
+      console.log('[PDF] ✅ 从缓存加载')
+      pdfDocument = pdfDocumentCache.get(pdfPath)!
+      updateCacheAccess(pdfPath)
+    } else {
+      console.log('[PDF] 📥 从文件加载')
+      
+      // 通过 IPC 读取 PDF 文件
+      const arrayBuffer = await window.api.pdf.readPDF(pdfPath)
+      console.log('[PDF] PDF 数据读取成功:', arrayBuffer.byteLength, 'bytes')
+      
+      // 加载 PDF 文档
+      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer })
+      pdfDocument = await loadingTask.promise
+      
+      console.log('[PDF] 文档加载成功,总页数:', pdfDocument.numPages)
+      
+      // 添加到缓存
+      evictOldestCache() // 先清理旧缓存
+      pdfDocumentCache.set(pdfPath, pdfDocument)
+      updateCacheAccess(pdfPath)
+      console.log('[PDF] 💾 已缓存,当前缓存数:', pdfDocumentCache.size)
+    }
     
     // 更新总页数
     if (readerState.value) {
@@ -199,6 +252,14 @@ onUnmounted(() => {
   if (pdfViewer.value) {
     pdfViewer.value.cleanup()
   }
+  
+  // 清理所有缓存的 PDF 文档
+  console.log('[PDF Cache] 清理所有缓存,共', pdfDocumentCache.size, '个文档')
+  pdfDocumentCache.forEach((doc) => {
+    doc.destroy()
+  })
+  pdfDocumentCache.clear()
+  cacheAccessOrder.length = 0
 })
 </script>
 
