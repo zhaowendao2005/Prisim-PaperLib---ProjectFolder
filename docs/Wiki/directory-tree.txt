@@ -17,7 +17,7 @@ Prisim-PaperLib---ProjectFolder/
 │   │   └── storage-key-naming-convention.md
 │   └── workflows/
 │       ├── analyze-conversation.md
-│       ├── deepwiki-workflow.mdd
+│       ├── deepwiki-workflow.md
 │       ├── document-revision.md
 │       ├── function-research.md
 │       ├── make-a-detail-plan-v2.md
@@ -49,6 +49,7 @@ Prisim-PaperLib---ProjectFolder/
 │   │       ├── design.md
 │   │       └── e2e-test.md
 │   └── Wiki/
+│       └── directory-tree.txt
 ├── Prisim--PaperLib/
 │   ├── .local-packages/
 │   ├── .vscode/

@@ -1,6 +1,6 @@
 ---
-description: 
-auto_execution_mode: 1
+description: auto_execution_mode: 1
+auto_execution_mode: 3
 ---
 
 # DeepWiki 工作流提示词
@@ -12,7 +12,7 @@ auto_execution_mode: 1
 ## 🎯 工作模式判定
 
 当用户提及 wiki/文档/DeepWiki 相关操作时，按以下优先级执行：
-
+输出文件目录  docs\Wiki
 ### 优先级规则
 1. **P0 - 用户明确指令**：用户明确说明要做什么 → 直接执行
 2. **P1 - 智能判断**：用户未明确 → 自动判定场景 → **行动前先告知用户准备做什么，等待确认**
@@ -52,6 +52,7 @@ END
 **📋 命令速查：生成目录树**
 ```powershell
 # 在项目根目录执行（生成完整目录树到 docs/Wiki/directory-tree.txt）
+项目根目录声明和校验：.\ 注意不是Prisim--PaperLib\
 npm run generate-tree
 
 
@@ -62,22 +63,16 @@ npm run generate-tree
 - 为后续扫描制定精准计划
 
 #### 第二轮：规模评估与计划制定
+直接读取docs/Wiki/directory-tree.txt 来进行分析 ，尽量不要使用powershell以减少出错概率
+**读取目录树并分析**
 
-**📋 命令速查：读取目录树并分析**
-```powershell
 # 1. 读取生成的目录树
-Get-Content "docs\Wiki\directory-tree.txt"
 
 # 2. 统计源文件数量
-(Get-ChildItem -Recurse -Include *.ts,*.vue,*.py | Where-Object { 
-  $_.FullName -notmatch 'node_modules|dist|\.git|Reference' 
-}).Count
+
 
 # 3. 按文件类型分类统计
-Get-ChildItem -Recurse -Include *.ts,*.vue,*.py | Where-Object { 
-  $_.FullName -notmatch 'node_modules|dist|\.git|Reference' 
-} | Group-Object Extension | Select-Object Name, Count
-```
+
 
 #### 输出：扫描计划
 ```
@@ -723,5 +718,3 @@ sequenceDiagram
 ```
 
 ---
-
-
