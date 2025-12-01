@@ -2,10 +2,25 @@
 /**
  * MainPage 标签栏组件 - Safari 风格悬浮胶囊
  */
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useTabManager } from '@composables/page-navigation'
 import type { TabItem } from '@composables/page-navigation'
 
-const { tabs, activeTabId, setActiveTab, addTab, closeTab } = useTabManager()
+const { 
+  tabs, 
+  activeTabId, 
+  setActiveTab, 
+  addTab, 
+  closeTab,
+  closeOtherTabs,
+  closeAllTabs,
+  isClosable,
+  closableTabsCount
+} = useTabManager()
+
+// ============================================================
+// Tab 图标
+// ============================================================
 
 /** 获取 Tab 图标 */
 function getTabIcon(type: TabItem['type']) {
@@ -13,10 +28,15 @@ function getTabIcon(type: TabItem['type']) {
     home: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
     project: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
     'new-tab': 'M12 6v6m0 0v6m0-6h6m-6 0H6',
+    'single-file-page': 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
     settings: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z'
   }
   return icons[type] ?? icons['new-tab']
 }
+
+// ============================================================
+// Tab 操作
+// ============================================================
 
 /** 处理关闭 Tab */
 function handleCloseTab(e: Event, id: string) {
@@ -28,6 +48,83 @@ function handleCloseTab(e: Event, id: string) {
 function handleAddTab() {
   addTab('new-tab', 'New Tab')
 }
+
+// ============================================================
+// 右键上下文菜单 (TabBar 专用)
+// ============================================================
+
+/** 菜单状态 */
+const contextMenuVisible = ref(false)
+const contextMenuPosition = ref({ x: 0, y: 0 })
+const contextMenuTargetId = ref<string | null>(null)
+
+/** 当前目标 Tab 是否可关闭 */
+const canCloseTarget = computed(() => 
+  contextMenuTargetId.value ? isClosable(contextMenuTargetId.value) : false
+)
+
+/** 是否有其他可关闭的 Tab */
+const hasOtherClosableTabs = computed(() => {
+  if (!contextMenuTargetId.value) return false
+  const othersCount = tabs.value.filter(
+    t => t.id !== contextMenuTargetId.value && isClosable(t.id)
+  ).length
+  return othersCount > 0
+})
+
+/** 处理右键菜单 */
+function handleContextMenu(e: MouseEvent, tabId: string) {
+  e.preventDefault()
+  e.stopPropagation()
+  
+  contextMenuTargetId.value = tabId
+  contextMenuPosition.value = { x: e.clientX, y: e.clientY }
+  contextMenuVisible.value = true
+}
+
+/** 关闭右键菜单 */
+function closeContextMenu() {
+  contextMenuVisible.value = false
+  contextMenuTargetId.value = null
+}
+
+/** 菜单操作: 关闭标签页 */
+function menuCloseTab() {
+  if (contextMenuTargetId.value && canCloseTarget.value) {
+    closeTab(contextMenuTargetId.value)
+  }
+  closeContextMenu()
+}
+
+/** 菜单操作: 关闭其他标签页 */
+function menuCloseOtherTabs() {
+  if (contextMenuTargetId.value) {
+    closeOtherTabs(contextMenuTargetId.value)
+  }
+  closeContextMenu()
+}
+
+/** 菜单操作: 关闭所有标签页 */
+function menuCloseAllTabs() {
+  closeAllTabs()
+  closeContextMenu()
+}
+
+/** 点击外部关闭菜单 */
+function handleClickOutside(e: MouseEvent) {
+  const target = e.target as HTMLElement
+  if (!target.closest('.tab-context-menu')) {
+    closeContextMenu()
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
+})
 </script>
 
 <template>
@@ -40,6 +137,7 @@ function handleAddTab() {
         class="tab-pill"
         :class="{ active: activeTabId === tab.id }"
         @click="setActiveTab(tab.id)"
+        @contextmenu="handleContextMenu($event, tab.id)"
       >
         <div class="tab-icon-wrapper">
           <!-- Icon (hidden on hover for closable tabs) -->
@@ -67,6 +165,43 @@ function handleAddTab() {
         </svg>
       </button>
     </div>
+
+    <!-- TabBar 右键上下文菜单 (macOS 风格) -->
+    <Teleport to="body">
+      <Transition name="context-menu">
+        <div
+          v-if="contextMenuVisible"
+          class="tab-context-menu"
+          :style="{
+            left: contextMenuPosition.x + 'px',
+            top: contextMenuPosition.y + 'px'
+          }"
+        >
+          <div
+            class="context-menu-item"
+            :class="{ disabled: !canCloseTarget }"
+            @click="menuCloseTab"
+          >
+            关闭标签页
+          </div>
+          <div class="context-menu-divider"></div>
+          <div
+            class="context-menu-item"
+            :class="{ disabled: !hasOtherClosableTabs }"
+            @click="menuCloseOtherTabs"
+          >
+            关闭其他标签页
+          </div>
+          <div
+            class="context-menu-item"
+            :class="{ disabled: closableTabsCount === 0 }"
+            @click="menuCloseAllTabs"
+          >
+            关闭所有标签页
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </nav>
 </template>
 
@@ -213,5 +348,100 @@ function handleAddTab() {
 .add-tab-btn svg {
   width: 16px;
   height: 16px;
+}
+
+/* ============================================================
+   TabBar 右键上下文菜单 (macOS 风格)
+   使用 :global() 因为菜单通过 Teleport 渲染到 body
+   ============================================================ */
+:global(.tab-context-menu) {
+  position: fixed;
+  z-index: 9999;
+  min-width: 180px;
+  padding: 4px 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px) saturate(180%);
+  border-radius: 8px;
+  box-shadow: 
+    0 0 0 0.5px rgba(0, 0, 0, 0.1),
+    0 10px 38px -10px rgba(22, 23, 24, 0.35),
+    0 10px 20px -15px rgba(22, 23, 24, 0.2);
+  user-select: none;
+}
+
+:global(.tab-context-menu .context-menu-item) {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: background-color 0.1s;
+}
+
+:global(.tab-context-menu .context-menu-item:hover:not(.disabled)) {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+:global(.tab-context-menu .context-menu-item.disabled) {
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+:global(.tab-context-menu .context-menu-divider) {
+  height: 1px;
+  margin: 4px 8px;
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+/* 非线性动画 - ease-out-back 效果 */
+:global(.context-menu-enter-active) {
+  animation: context-menu-in 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+:global(.context-menu-leave-active) {
+  animation: context-menu-out 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes context-menu-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.95) translateY(-4px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes context-menu-out {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+
+/* 暗色模式适配 */
+@media (prefers-color-scheme: dark) {
+  :global(.tab-context-menu) {
+    background: rgba(40, 40, 40, 0.95);
+    box-shadow: 
+      0 0 0 0.5px rgba(255, 255, 255, 0.1),
+      0 10px 38px -10px rgba(0, 0, 0, 0.5),
+      0 10px 20px -15px rgba(0, 0, 0, 0.4);
+  }
+  
+  :global(.tab-context-menu .context-menu-item:hover:not(.disabled)) {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+  
+  :global(.tab-context-menu .context-menu-divider) {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
 }
 </style>

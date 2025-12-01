@@ -68,10 +68,13 @@ export function useTabManager() {
     return id
   }
 
+  /** 判断 Tab 是否可关闭 */
+  const isClosable = (id: string) => id !== 'home'
+
   /** 关闭 Tab */
   const closeTab = (id: string) => {
     // 不允许关闭 Home Tab
-    if (id === 'home') return
+    if (!isClosable(id)) return
 
     const index = tabs.value.findIndex(t => t.id === id)
     if (index === -1) return
@@ -85,6 +88,26 @@ export function useTabManager() {
     }
   }
 
+  /** 关闭其他 Tab (保留当前和 Home) */
+  const closeOtherTabs = (currentId: string) => {
+    const toClose = tabs.value.filter(
+      t => t.id !== currentId && isClosable(t.id)
+    )
+    toClose.forEach(t => closeTab(t.id))
+  }
+
+  /** 关闭所有可关闭的 Tab (保留 Home) */
+  const closeAllTabs = () => {
+    const toClose = tabs.value.filter(t => isClosable(t.id))
+    toClose.forEach(t => closeTab(t.id))
+    activeTabId.value = 'home'
+  }
+
+  /** 获取可关闭的 Tab 数量 */
+  const closableTabsCount = computed(() => 
+    tabs.value.filter(t => isClosable(t.id)).length
+  )
+
   /** 更新 Tab 信息 */
   const updateTab = (id: string, updates: Partial<Omit<TabItem, 'id'>>) => {
     const tab = tabs.value.find(t => t.id === id)
@@ -97,9 +120,13 @@ export function useTabManager() {
     tabs,
     activeTabId,
     activeTab,
+    closableTabsCount,
     setActiveTab,
     addTab,
     closeTab,
+    closeOtherTabs,
+    closeAllTabs,
+    isClosable,
     updateTab
   }
 }
