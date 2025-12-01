@@ -1,5 +1,5 @@
 ---
-description: 
+description: auto_execution_mode: 1
 auto_execution_mode: 1
 ---
 
@@ -144,7 +144,7 @@ git diff <LAST_COMMIT> HEAD -- <file_path>
 # 在 wiki 中定位相关章节
 Select-String -Path wiki.md -Pattern "^#.*\[L" | Select-String "<模块关键词>"
 ```
-
+# 注 必须关注的整个文档中各个mermaid图，必须关注是否有修改或者变更或者扩展的项
 #### Step 5: 输出变更计划
 ```
 📝 检测到以下变更需要同步到 wiki：

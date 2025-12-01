@@ -2,7 +2,7 @@
 <!-- AI-HINT: 使用 Select-String -Pattern "^#" 获取目录结构 -->
 
 # [ROOT] Prisim-PaperLib 技术文档
-> 版本: 1.0.0 | 最后更新: 2024-12-01
+> 版本: 1.1.0 | 最后更新: 2024-12-02
 
 ---
 
@@ -11,6 +11,7 @@
 | 序号 | 日期 | Commit | 分支 | 摘要 |
 |------|------|--------|------|------|
 | 001 | 2024-12-01 | - | main | 初始化文档 - Round 1-5 全部完成 |
+| 002 | 2024-12-02 | 1b5933a | main | 集成 MinerU OCR 功能 |
 <!-- /VERSION-RECORD -->
 
 ---
@@ -55,6 +56,7 @@
 | **数据库** | better-sqlite3 |
 | **PDF 解析** | pdfjs-dist 4.0 |
 | **文件监听** | chokidar 3.6 |
+| **OCR 服务** | MinerU API v4 |
 
 ## [L1-03] 目录结构
 
@@ -100,40 +102,176 @@ Prisim--PaperLib/
 
 # [L2] 架构总览
 
-## [L2-01] 系统架构图
+## [L2-01] 系统总架构图
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#e3f2fd','primaryTextColor':'#1565c0','primaryBorderColor':'#1976d2','lineColor':'#64b5f6','secondaryColor':'#f3e5f5','tertiaryColor':'#fff3e0','fontSize':'14px'}}}%%
 graph TB
-    subgraph 渲染进程 [Renderer Process]
-        V[Vue Views/Components]
-        S[Pinia Stores]
-        DS[DataSource]
+    subgraph UI["🖥️ 用户界面层"]
+        direction LR
+        HomePage["📚 主页<br/><small>论文库列表</small>"]
+        SingleFile["📄 单文件阅读页<br/><small>PDF 阅读器</small>"]
+        Settings["⚙️ 设置页<br/><small>通用/扩展</small>"]
+        ProgressDialog["📊 进度对话框<br/><small>任务监控</small>"]
     end
     
-    subgraph 预加载脚本 [Preload Script]
-        API[Preload APIs]
+    subgraph State["📦 状态管理层 (Pinia)"]
+        direction LR
+        LibraryStore["LibraryMetaStore<br/><small>论文库元数据</small>"]
+        ReaderStore["PaperReaderStore<br/><small>阅读器状态</small>"]
+        MineruStore["MineruTaskStore<br/><small>OCR 任务</small>"]
     end
     
-    subgraph 主进程 [Main Process]
-        IPC[IPC Handlers]
-        SVC[Services]
-        DB[(SQLite)]
-        FS[(文件系统)]
+    subgraph DataSource["🔌 数据源层"]
+        direction LR
+        LibraryDS["LibraryDataSource<br/><small>Electron/Mock</small>"]
+        MineruDS["MineruDataSource<br/><small>Electron</small>"]
     end
     
-    V --> S
-    S --> DS
-    DS --> API
-    API -->|contextBridge| IPC
-    IPC --> SVC
-    SVC --> DB
-    SVC --> FS
+    subgraph Bridge["🌉 桥接层 (Preload)"]
+        direction LR
+        LibraryAPI["LibraryApi"]
+        SystemAPI["SystemApi"]
+        MineruAPI["MineruApi"]
+    end
+    
+    subgraph IPC["📡 IPC 通信层"]
+        direction LR
+        LibraryIPC["library.ipc.ts"]
+        SystemIPC["system.ipc.ts"]
+        MineruIPC["mineru.ipc.ts"]
+    end
+    
+    subgraph Service["⚙️ 服务层 (Main Process)"]
+        direction LR
+        LibraryService["LibraryService<br/><small>论文管理</small>"]
+        SystemService["SystemService<br/><small>配置管理</small>"]
+        MineruService["MineruService<br/><small>OCR 服务</small>"]
+        WatcherService["WatcherService<br/><small>文件监听</small>"]
+    end
+    
+    subgraph Storage["💾 持久化层"]
+        direction LR
+        SQLite[("📊 SQLite<br/><small>papers.index.json</small>")]
+        FileSystem[("📁 文件系统<br/><small>PDF 文件</small>")]
+        Config[("⚙️ 配置文件<br/><small>System.config.json</small>")]
+        MineruCache[("💾 任务缓存<br/><small>.mineru-tasks.json</small>")]
+    end
+    
+    subgraph External["🌐 外部服务"]
+        direction LR
+        MineruAPI_External["🔮 MinerU API<br/><small>mineru.net</small>"]
+        OSS["☁️ 阿里云 OSS<br/><small>文件上传</small>"]
+    end
+    
+    %% UI → State (粗实线)
+    HomePage ==> LibraryStore
+    SingleFile ==> ReaderStore
+    SingleFile ==> MineruStore
+    Settings ==> MineruStore
+    ProgressDialog ==> MineruStore
+    
+    %% State → DataSource (粗实线)
+    LibraryStore ==> LibraryDS
+    MineruStore ==> MineruDS
+    
+    %% DataSource → Bridge (曲线)
+    LibraryDS -.-> LibraryAPI
+    MineruDS -.-> MineruAPI
+    MineruDS -.-> SystemAPI
+    
+    %% Bridge → IPC (虚线标注)
+    LibraryAPI -.-|"🔒 contextBridge"| LibraryIPC
+    SystemAPI -.-|"🔒 contextBridge"| SystemIPC
+    MineruAPI -.-|"🔒 contextBridge"| MineruIPC
+    
+    %% IPC → Service (粗实线)
+    LibraryIPC ==> LibraryService
+    SystemIPC ==> SystemService
+    MineruIPC ==> MineruService
+    
+    %% Service → Storage (实线)
+    LibraryService --> SQLite
+    LibraryService --> FileSystem
+    SystemService --> Config
+    MineruService --> MineruCache
+    
+    %% Service → External (粗虚线)
+    MineruService ==o MineruAPI_External
+    MineruService ==o OSS
+    
+    %% Watcher → Service (双向)
+    WatcherService <--> LibraryService
+    FileSystem -.-|"👁️ 监听"| WatcherService
+    
+    %% 事件反向通知 (虚线箭头)
+    LibraryService -.->|"📢 事件广播"| LibraryIPC
+    MineruService -.->|"📢 任务更新"| MineruIPC
+    
+    %% 样式定义
+    classDef uiClass fill:#e3f2fd,stroke:#1976d2,stroke-width:3px,color:#0d47a1,rx:10,ry:10
+    classDef stateClass fill:#f3e5f5,stroke:#7b1fa2,stroke-width:3px,color:#4a148c,rx:10,ry:10
+    classDef bridgeClass fill:#e0f7fa,stroke:#00838f,stroke-width:2px,color:#006064,rx:8,ry:8
+    classDef ipcClass fill:#fff9c4,stroke:#f57f17,stroke-width:2px,color:#f57f17,rx:8,ry:8
+    classDef serviceClass fill:#fff3e0,stroke:#f57c00,stroke-width:3px,color:#e65100,rx:10,ry:10
+    classDef storageClass fill:#e8f5e9,stroke:#388e3c,stroke-width:3px,color:#1b5e20,rx:15,ry:15
+    classDef externalClass fill:#fce4ec,stroke:#c2185b,stroke-width:3px,color:#880e4f,rx:10,ry:10
+    
+    class HomePage,SingleFile,Settings,ProgressDialog uiClass
+    class LibraryStore,ReaderStore,MineruStore stateClass
+    class LibraryDS,MineruDS bridgeClass
+    class LibraryAPI,SystemAPI,MineruAPI bridgeClass
+    class LibraryIPC,SystemIPC,MineruIPC ipcClass
+    class LibraryService,SystemService,MineruService,WatcherService serviceClass
+    class SQLite,FileSystem,Config,MineruCache storageClass
+    class MineruAPI_External,OSS externalClass
 ```
 
-## [L2-02] 分层设计
+## [L2-02] 技术架构图
 
-| 层级 | 职责 | 目录 |
-|------|------|------|
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#f5f5f7','primaryTextColor':'#1d1d1f','primaryBorderColor':'#86868b','lineColor':'#0071e3','secondaryColor':'#fafafa','tertiaryColor':'#ffffff','fontSize':'15px','fontFamily':'SF Pro Display, -apple-system, sans-serif'}}}%%
+graph TB
+    subgraph Renderer["🎨 渲染进程 (Renderer Process)"]
+        V["Vue Views<br/><small>组件层</small>"]
+        S["Pinia Stores<br/><small>状态管理</small>"]
+        DS["DataSource<br/><small>数据适配</small>"]
+    end
+    
+    subgraph Preload["🔐 预加载脚本 (Preload Script)"]
+        API["Preload APIs<br/><small>安全桥接</small>"]
+    end
+    
+    subgraph Main["⚡ 主进程 (Main Process)"]
+        IPC["IPC Handlers<br/><small>通信处理</small>"]
+        SVC["Services<br/><small>业务逻辑</small>"]
+        DB[("💾 SQLite<br/><small>结构化数据</small>")]
+        FS[("📁 FileSystem<br/><small>文件存储</small>")]
+    end
+    
+    V ==> S
+    S ==> DS
+    DS -.-> API
+    API -.-|"🔒 contextBridge"| IPC
+    IPC ==> SVC
+    SVC --> DB
+    SVC --> FS
+    
+    classDef rendererClass fill:#e8f4fd,stroke:#0071e3,stroke-width:2.5px,color:#1d1d1f,rx:12,ry:12
+    classDef preloadClass fill:#fff4e6,stroke:#ff9500,stroke-width:2.5px,color:#1d1d1f,rx:12,ry:12
+    classDef mainClass fill:#f0f0f5,stroke:#5e5ce6,stroke-width:2.5px,color:#1d1d1f,rx:12,ry:12
+    classDef storageClass fill:#e8f5e9,stroke:#34c759,stroke-width:2.5px,color:#1d1d1f,rx:16,ry:16
+    
+    class V,S,DS rendererClass
+    class API preloadClass
+    class IPC,SVC mainClass
+    class DB,FS storageClass
+```
+
+## [L2-03] 分层设计
+
+| 🎨 层级 | 📋 职责 | 📂 目录 |
+|--------|--------|--------|
 | **表现层** | Vue 组件、页面路由、样式 | `client/src/renderer/views/`, `components/` |
 | **状态层** | Pinia Store、响应式状态 | `client/src/renderer/stores/` |
 | **数据源层** | DataSource 适配器模式 | `stores/*/xxx.datasource.ts` |
@@ -142,7 +280,7 @@ graph TB
 | **服务层** | 业务逻辑、文件操作 | `electron/main/services/` |
 | **持久层** | SQLite、文件系统 | - |
 
-## [L2-03] 进程模型
+## [L2-04] 进程模型
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -233,58 +371,104 @@ interface AppConfig {
     openLastPaper: boolean
     autoCheckUpdate: boolean
   }
+  extensions?: {
+    mineru?: MineruConfig  // MinerU OCR 配置
+  }
 }
+
+interface MineruConfig {
+  apiKey: string
+  modelVersion: 'pipeline' | 'vlm'
+  enableOcr: boolean
+  enableFormula: boolean
+  enableTable: boolean
+  language: string
+  pollingIntervalSec: number
+}
+```
+
+### [L3-01-E] MineruTask - OCR 任务
+
+```typescript
+interface MineruTask {
+  localId: string              // 本地任务 ID
+  paperId: string              // 关联论文 ID
+  fileName: string             // 文件名
+  pdfPath: string              // 本地 PDF 路径
+  batchId: string              // MinerU 批次 ID
+  dataId: string               // 数据 ID
+  state: MineruTaskState       // 任务状态
+  progress?: MineruTaskProgress // 解析进度
+  resultZipUrl?: string        // 结果下载 URL
+  resultLocalPath?: string     // 本地结果路径
+  errorMsg?: string            // 错误信息
+  createdAt: number            // 创建时间戳
+  updatedAt: number            // 更新时间戳
+}
+
+type MineruTaskState = 'uploading' | 'pending' | 'running' | 'done' | 'failed'
 ```
 
 ## [L3-02] 实体关系图
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#f5f5f7','primaryTextColor':'#1d1d1f','primaryBorderColor':'#0071e3','lineColor':'#0071e3','secondaryColor':'#e8f4fd','tertiaryColor':'#fff4e6','fontSize':'14px','fontFamily':'SF Pro Text, -apple-system, sans-serif'}}}%%
 erDiagram
-    PaperDatabase ||--o{ PaperMeta : contains
-    PaperMeta }o--o{ Tag : "has tags"
-    PaperDatabase ||--o{ Tag : defines
+    PaperDatabase ||--o{ PaperMeta : "📚 contains"
+    PaperMeta }o--o{ Tag : "🏷️ has tags"
+    PaperDatabase ||--o{ Tag : "🎨 defines"
+    PaperMeta ||--o{ MineruTask : "🔮 ocr tasks"
     
     PaperDatabase {
-        string id PK
-        string name
-        string path
-        number createdAt
-        number lastOpenedAt
-        number paperCount
+        string id PK "唯一标识"
+        string name "库名称"
+        string path "存储路径"
+        number createdAt "创建时间"
+        number lastOpenedAt "最后打开"
+        number paperCount "论文数量"
     }
     
     PaperMeta {
-        string id PK
-        string dirname
-        string filename
-        string title
-        string[] authors
-        string[] tags FK
-        number fileSize
-        number addedAt
+        string id PK "论文ID"
+        string dirname "目录名"
+        string filename "文件名"
+        string title "标题"
+        string[] authors "作者列表"
+        string[] tags FK "标签ID"
+        number fileSize "文件大小"
+        number addedAt "添加时间"
     }
     
     Tag {
-        string id PK
-        string name
-        string color
-        number count
+        string id PK "标签ID"
+        string name "标签名"
+        string color "颜色值"
+        number count "引用计数"
+    }
+    
+    MineruTask {
+        string localId PK "本地任务ID"
+        string paperId FK "关联论文"
+        string batchId "批次ID"
+        string state "任务状态"
+        string resultZipUrl "结果URL"
+        number createdAt "创建时间"
     }
 ```
 
 ## [L3-03] 存储结构
 
-### 文件系统结构
+### 📁 文件系统结构
 
 ```
-<library-path>/
-├── .prisim/
-│   ├── config.json         # 库配置
-│   ├── papers.index.json   # 论文索引
-│   └── tags.index.json     # 标签索引
-├── _imports/               # 导入暂存区
-└── <paper-dirname>/        # 论文目录（如 "Title.a1b2c3d4/"）
-    └── <paper>.pdf
+📂 <library-path>/
+├── 🗂️ .prisim/
+│   ├── ⚙️ config.json         # 库配置
+│   ├── 📊 papers.index.json   # 论文索引
+│   └── 🏷️ tags.index.json     # 标签索引
+├── 📥 _imports/               # 导入暂存区
+└── 📄 <paper-dirname>/        # 论文目录（如 "Title.a1b2c3d4/"）
+    └── 📋 <paper>.pdf
 ```
 
 ---
@@ -302,37 +486,52 @@ UI Component → Pinia Store → DataSource → Preload API → IPC Handler → 
 ## [L4-02] 核心链路图
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#f5f5f7','primaryTextColor':'#1d1d1f','primaryBorderColor':'#86868b','lineColor':'#0071e3','secondaryColor':'#e8f4fd','tertiaryColor':'#fff4e6','fontSize':'14px','fontFamily':'SF Pro Text, -apple-system, sans-serif'}}}%%
 graph LR
-    subgraph 表现层
-        A[Vue Component]
+    subgraph UI["🎨 表现层"]
+        A["Vue Component<br/><small>用户交互</small>"]
     end
-    subgraph 状态层
-        B[Pinia Store]
+    subgraph State["📦 状态层"]
+        B["Pinia Store<br/><small>状态管理</small>"]
     end
-    subgraph 数据源层
-        C[DataSource]
+    subgraph DS["🔌 数据源层"]
+        C["DataSource<br/><small>适配器</small>"]
     end
-    subgraph 桥接层
-        D[Preload API]
+    subgraph Bridge["🌉 桥接层"]
+        D["Preload API<br/><small>安全桥接</small>"]
     end
-    subgraph 主进程
-        E[IPC Handler]
-        F[Service]
-        G[(SQLite/FS)]
+    subgraph Main["⚡ 主进程"]
+        E["IPC Handler<br/><small>通信处理</small>"]
+        F["Service<br/><small>业务逻辑</small>"]
+        G[("💾 Storage<br/><small>SQLite/FS</small>")]
     end
     
-    A -->|调用 action| B
-    B -->|调用| C
-    C -->|window.api| D
-    D -->|ipcRenderer| E
-    E -->|invoke| F
-    F -->|读写| G
-    G -.->|返回| F
-    F -.->|返回| E
-    E -.->|返回| D
-    D -.->|返回| C
-    C -.->|更新 state| B
-    B -.->|响应式更新| A
+    A ==|"1️⃣ 调用 action"| B
+    B ==|"2️⃣ 调用方法"| C
+    C -.->|"3️⃣ window.api"| D
+    D -.-|"4️⃣ ipcRenderer"| E
+    E ==>|"5️⃣ invoke"| F
+    F -->|"6️⃣ 读写"| G
+    G -.->|"7️⃣ 返回数据"| F
+    F -.->|"8️⃣ 返回结果"| E
+    E -.->|"9️⃣ 返回响应"| D
+    D -.->|"🔟 返回数据"| C
+    C -.->|"1️⃣1️⃣ 更新 state"| B
+    B -.->|"1️⃣2️⃣ 响应式更新"| A
+    
+    classDef uiClass fill:#e8f4fd,stroke:#0071e3,stroke-width:2.5px,color:#1d1d1f,rx:12,ry:12
+    classDef stateClass fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2.5px,color:#1d1d1f,rx:12,ry:12
+    classDef dsClass fill:#e0f7fa,stroke:#00838f,stroke-width:2.5px,color:#1d1d1f,rx:12,ry:12
+    classDef bridgeClass fill:#fff4e6,stroke:#ff9500,stroke-width:2.5px,color:#1d1d1f,rx:12,ry:12
+    classDef mainClass fill:#f0f0f5,stroke:#5e5ce6,stroke-width:2.5px,color:#1d1d1f,rx:12,ry:12
+    classDef storageClass fill:#e8f5e9,stroke:#34c759,stroke-width:2.5px,color:#1d1d1f,rx:16,ry:16
+    
+    class A uiClass
+    class B stateClass
+    class C dsClass
+    class D bridgeClass
+    class E,F mainClass
+    class G storageClass
 ```
 
 ## [L4-03] 链路详解
@@ -340,24 +539,24 @@ graph LR
 ### [L4-03-A] 链路: 获取论文列表
 
 ```
-HomePage.vue
-  → libraryMetaStore.loadPapers(databaseId)
-    → datasource.getPapers(databaseId)
-      → window.api.library.getPapers(databaseId)
-        → ipcMain.handle('library:getPapers')
-          → libraryService.getPapers(databaseId)
-            → 读取 papers.index.json
-              → 返回 PaperMeta[]
+📄 HomePage.vue
+  → 📦 libraryMetaStore.loadPapers(databaseId)
+    → 🔌 datasource.getPapers(databaseId)
+      → 🌉 window.api.library.getPapers(databaseId)
+        → 📡 ipcMain.handle('library:getPapers')
+          → ⚙️ libraryService.getPapers(databaseId)
+            → 📊 读取 papers.index.json
+              → 📬 返回 PaperMeta[]
 ```
 
 ### [L4-03-B] 链路: 导入论文
 
 ```
-DropZone.vue (拖放文件)
-  → libraryMetaStore.importPapers(databaseId, filePaths)
-    → datasource.importPapers(databaseId, filePaths)
-      → window.api.library.importPapers(...)
-        → ipcMain.handle('library:importPapers')
+📂 DropZone.vue (拖放文件)
+  → 📦 libraryMetaStore.importPapers(databaseId, filePaths)
+    → 🔌 datasource.importPapers(databaseId, filePaths)
+      → 🌉 window.api.library.importPapers(...)
+        → 📡 ipcMain.handle('library:importPapers')
           → libraryService.importPapers(...)
             → 复制 PDF 到论文目录
             → 检测 PDF 类型
@@ -375,6 +574,7 @@ DropZone.vue (拖放文件)
 项目使用 **Pinia** 进行状态管理，核心 Store：
 - `library-meta` - 论文库元数据（PaperDatabase[], PaperMeta[]）
 - `paper-reader` - PDF 阅读器状态
+- `mineru-task` - MinerU OCR 任务状态
 
 ## [L5-02] 全局状态结构
 
@@ -392,6 +592,15 @@ AppState
 │   ├── readerStates: Map<paperId, PaperReaderState>
 │   └── activePaperId (computed)
 │
+├── mineru-task
+│   ├── tasks: Map<localId, MineruTask>  # 任务映射
+│   ├── loading: boolean
+│   ├── error: Error | null
+│   ├── initialized: boolean
+│   ├── taskList (computed)              # 任务列表
+│   ├── activeTasks (computed)           # 活跃任务
+│   └── globalProgress (computed)        # 全局进度统计
+│
 └── page-navigation (composable)
     ├── tabs: TabItem[]
     ├── activeTabId: string
@@ -405,25 +614,47 @@ AppState
 ### [L5-03-A] LibraryMetaStore 状态机
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#e8f4fd','primaryTextColor':'#1d1d1f','primaryBorderColor':'#0071e3','lineColor':'#0071e3','fontSize':'14px','fontFamily':'SF Pro Text, -apple-system, sans-serif'}}}%%
 stateDiagram-v2
-    [*] --> Uninitialized
-    Uninitialized --> Loading : initialize()
-    Loading --> Ready : fetchDatabases() 成功
-    Loading --> Error : fetchDatabases() 失败
-    Ready --> Loading : createDatabase() / removeDatabase()
-    Ready --> Ready : selectDatabase() / loadPapers()
-    Error --> Loading : 重试
+    [*] --> Uninitialized: 🚀 启动
+    Uninitialized --> Loading : 📥 initialize()
+    Loading --> Ready : ✅ fetchDatabases() 成功
+    Loading --> Error : ❌ fetchDatabases() 失败
+    Ready --> Loading : 🔄 createDatabase() / removeDatabase()
+    Ready --> Ready : 📂 selectDatabase() / loadPapers()
+    Error --> Loading : 🔁 重试
+    Ready --> [*] : 🛑 销毁
 ```
 
 ### [L5-03-B] PaperReaderStore 状态机
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#f3e5f5','primaryTextColor':'#1d1d1f','primaryBorderColor':'#7b1fa2','lineColor':'#7b1fa2','fontSize':'14px','fontFamily':'SF Pro Text, -apple-system, sans-serif'}}}%%
 stateDiagram-v2
-    [*] --> Idle
-    Idle --> Opening : openPaper()
-    Opening --> Active : Tab 创建成功
-    Active --> Active : setCurrentPage() / setZoomLevel()
-    Active --> Idle : closePaper()
+    [*] --> Idle: 💤 空闲
+    Idle --> Opening : 📖 openPaper()
+    Opening --> Active : ✅ Tab 创建成功
+    Active --> Active : 📄 setCurrentPage()<br/>🔍 setZoomLevel()
+    Active --> Idle : ❌ closePaper()
+    Idle --> [*] : 🛑 销毁
+```
+
+### [L5-03-C] MineruTaskStore 状态机
+
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#fff4e6','primaryTextColor':'#1d1d1f','primaryBorderColor':'#ff9500','lineColor':'#ff9500','fontSize':'14px','fontFamily':'SF Pro Text, -apple-system, sans-serif'}}}%%
+stateDiagram-v2
+    [*] --> Uninitialized: 🚀 启动
+    Uninitialized --> Loading : 📥 initialize()
+    Loading --> Ready : ✅ 加载缓存成功
+    Ready --> Uploading : 📤 submitLocalOcrTask()
+    Uploading --> Pending : ✅ 文件上传成功
+    Pending --> Running : 🔄 MinerU 开始处理
+    Running --> Done : ✅ 解析完成
+    Running --> Failed : ❌ 解析失败
+    Done --> Ready : 📥 downloadResult()
+    Failed --> Ready : 🔄 清除失败任务
+    Ready --> [*] : 🛑 销毁
 ```
 
 ## [L5-04] FileChangeEvent 处理
@@ -551,55 +782,57 @@ function createDataSource(): LibraryMetaDataSource {
 ### [L7-01-A] 应用启动初始化
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#f5f5f7','primaryTextColor':'#1d1d1f','primaryBorderColor':'#86868b','lineColor':'#0071e3','secondaryColor':'#e8f4fd','tertiaryColor':'#fff4e6','fontSize':'14px','fontFamily':'SF Pro Text, -apple-system, sans-serif'}}}%%
 sequenceDiagram
-    participant User
-    participant Main as Main Process
-    participant Preload
-    participant Renderer
-    participant Store as LibraryMetaStore
+    participant User as 👤 用户
+    participant Main as ⚡ 主进程
+    participant Preload as 🌉 预加载
+    participant Renderer as 🎨 渲染进程
+    participant Store as 📦 Store
     
-    User->>Main: 启动应用
-    Main->>Main: registerAllIpcHandlers()
-    Main->>Main: initializeAppDirectories()
-    Main->>Main: createMainWindow()
-    Main->>Preload: 加载 preload.js
-    Preload->>Renderer: contextBridge.exposeInMainWorld('api')
-    Renderer->>Store: useLibraryMetaStore()
-    Store->>Store: initialize()
-    Store->>Preload: api.library.getDatabases()
-    Preload->>Main: ipcRenderer.invoke
-    Main-->>Preload: PaperDatabase[]
-    Preload-->>Store: 返回数据
-    Store-->>Renderer: 响应式更新
-    Note over Main: 2秒后
-    Main->>Main: initializeWatchers() 启动文件监听
+    User->>Main: 🚀 启动应用
+    Main->>Main: 📡 registerAllIpcHandlers()
+    Main->>Main: 📁 initializeAppDirectories()
+    Main->>Main: 🪟 createMainWindow()
+    Main->>Preload: 📜 加载 preload.js
+    Preload->>Renderer: 🔗 contextBridge.exposeInMainWorld('api')
+    Renderer->>Store: 🏪 useLibraryMetaStore()
+    Store->>Store: 📥 initialize()
+    Store->>Preload: 🔍 api.library.getDatabases()
+    Preload->>Main: 📡 ipcRenderer.invoke
+    Main-->>Preload: 📊 PaperDatabase[]
+    Preload-->>Store: 📬 返回数据
+    Store-->>Renderer: 🔄 响应式更新
+    Note over Main: ⏰ 2秒后
+    Main->>Main: 👁️ initializeWatchers() 启动文件监听
 ```
 
 ### [L7-01-B] 导入论文流程
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#f5f5f7','primaryTextColor':'#1d1d1f','primaryBorderColor':'#86868b','lineColor':'#0071e3','secondaryColor':'#e8f4fd','tertiaryColor':'#fff4e6','fontSize':'14px','fontFamily':'SF Pro Text, -apple-system, sans-serif'}}}%%
 sequenceDiagram
-    participant User
-    participant DropZone
-    participant Store as LibraryMetaStore
-    participant DS as DataSource
-    participant API as Preload API
-    participant IPC
-    participant Service as LibraryService
-    participant FS as 文件系统
+    participant User as 👤 用户
+    participant DropZone as 📂 拖放区
+    participant Store as 📦 Store
+    participant DS as 🔌 DataSource
+    participant API as 🌉 Preload API
+    participant IPC as 📡 IPC
+    participant Service as ⚙️ Service
+    participant FS as 📁 文件系统
     
-    User->>DropZone: 拖放 PDF 文件
-    DropZone->>Store: importPapers(dbId, paths)
-    Store->>DS: importPapers()
-    DS->>API: api.library.importPapers()
-    API->>IPC: ipcRenderer.invoke
-    IPC->>Service: importPapers()
-    Service->>FS: 复制 PDF 文件
-    Service->>Service: detectPdfContentType()
-    Service->>FS: 写入 meta.json
-    Service->>FS: 更新 index.json
-    Service-->>IPC: PaperMeta[]
-    Service->>IPC: notifyFileChange({type: 'batch-add'})
+    User->>DropZone: 📤 拖放 PDF 文件
+    DropZone->>Store: 📋 importPapers(dbId, paths)
+    Store->>DS: 📞 importPapers()
+    DS->>API: 🔍 api.library.importPapers()
+    API->>IPC: 📡 ipcRenderer.invoke
+    IPC->>Service: 📋 importPapers()
+    Service->>FS: 📋 复制 PDF 文件
+    Service->>Service: 🔍 detectPdfContentType()
+    Service->>FS: 📝 写入 meta.json
+    Service->>FS: 📊 更新 index.json
+    Service-->>IPC: 📊 PaperMeta[]
+    Service->>IPC: 📢 notifyFileChange({type: 'batch-add'})
     IPC-->>API: webContents.send
     API-->>Store: onFileChange callback
     Store->>Store: handlePapersAdded()
@@ -609,23 +842,53 @@ sequenceDiagram
 ### [L7-01-C] 打开 PDF 阅读
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#f5f5f7','primaryTextColor':'#1d1d1f','primaryBorderColor':'#86868b','lineColor':'#0071e3','secondaryColor':'#e8f4fd','tertiaryColor':'#fff4e6','fontSize':'14px','fontFamily':'SF Pro Text, -apple-system, sans-serif'}}}%%
 sequenceDiagram
-    participant User
-    participant HomePage
-    participant ReaderStore as PaperReaderStore
-    participant TabManager
-    participant SingleFilePage
-    participant MainPanel as PDF MainPanel
+    participant User as 👤 用户
+    participant HomePage as 📚 主页
+    participant ReaderStore as 📖 ReaderStore
+    participant TabManager as 📑 TabManager
+    participant SingleFilePage as 📄 单文件页
+    participant MainPanel as 📋 PDF MainPanel
     
-    User->>HomePage: 双击论文卡片
-    HomePage->>ReaderStore: openPaper(paperId, libraryId, pdfPath, title)
-    ReaderStore->>TabManager: addTab('single-file-page', title)
-    TabManager-->>ReaderStore: tabId
-    ReaderStore->>TabManager: updateTab(tabId, {metadata})
-    ReaderStore->>ReaderStore: readerStates.set(paperId, state)
-    TabManager->>SingleFilePage: 渲染页面
-    SingleFilePage->>MainPanel: 传入 pdfPath
-    MainPanel->>MainPanel: 加载并渲染 PDF
+    User->>HomePage: 👆 双击论文卡片
+    HomePage->>ReaderStore: 📖 openPaper(paperId, libraryId, pdfPath, title)
+    ReaderStore->>TabManager: ➕ addTab('single-file-page', title)
+    TabManager-->>ReaderStore: 🆔 tabId
+    ReaderStore->>TabManager: 📝 updateTab(tabId, {metadata})
+    ReaderStore->>ReaderStore: 💾 readerStates.set(paperId, state)
+    TabManager->>SingleFilePage: 🎨 渲染页面
+    SingleFilePage->>MainPanel: 📂 传入 pdfPath
+    MainPanel->>MainPanel: 📄 加载并渲染 PDF
+```
+
+### [L7-01-D] MinerU OCR 任务提交流程
+
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#fff4e6','primaryTextColor':'#1d1d1f','primaryBorderColor':'#ff9500','lineColor':'#ff9500','secondaryColor':'#fff9c4','tertiaryColor':'#fce4ec','fontSize':'14px','fontFamily':'SF Pro Text, -apple-system, sans-serif'}}}%%
+sequenceDiagram
+    participant User as 👤 用户
+    participant Overview as 📄 OverviewPanel
+    participant MineruStore as 🔮 MineruStore
+    participant MineruAPI as 🌉 MineruAPI
+    participant MineruIPC as 📡 MineruIPC
+    participant MineruService as ⚙️ MineruService
+    participant MineruAPI_Ext as 🌐 MinerU API
+    participant OSS as ☁️ 阿里云 OSS
+    
+    User->>Overview: 👆 点击 OCR 按钮
+    Overview->>MineruStore: 📤 submitLocalOcrTask(params)
+    MineruStore->>MineruAPI: 🔍 api.mineru.submitLocalOcrTask()
+    MineruAPI->>MineruIPC: 📡 ipcRenderer.invoke
+    MineruIPC->>MineruService: 📋 submitLocalOcrTask()
+    MineruService->>MineruAPI_Ext: 📡 POST /file-urls/batch
+    MineruAPI_Ext-->>MineruService: 📄 预签名 URL
+    MineruService->>OSS: 📤 PUT 上传 PDF
+    OSS-->>MineruService: ✅ 上传成功
+    MineruService->>MineruService: 🔄 启动轮询器
+    MineruService-->>MineruIPC: 📊 MineruTask
+    MineruIPC-->>MineruStore: 📬 返回任务
+    MineruStore-->>Overview: 🔄 响应式更新
 ```
 
 ---
@@ -732,6 +995,77 @@ const META_FILE = 'meta.json'
 
 ---
 
+## [L8-05] mineru-task 模块
+
+### [L8-05-A] 职责
+管理 MinerU OCR 任务的提交、轮询、进度跟踪和结果下载。
+
+### [L8-05-B] 文件结构
+```
+stores/mineru-task/
+├── mineru-task.datasource.ts  # 数据源接口
+├── mineru-task.electron.ts    # Electron 实现
+└── mineru-task.store.ts        # Pinia Store
+```
+
+### [L8-05-C] 状态
+```typescript
+{
+  tasks: Map<localId, MineruTask>
+  loading: boolean
+  error: Error | null
+  initialized: boolean
+}
+```
+
+### [L8-05-D] Actions
+| Action | 说明 |
+|--------|------|
+| `initialize()` | 初始化，加载缓存任务 |
+| `submitLocalOcrTask(params)` | 提交 OCR 任务 |
+| `downloadResult(localId)` | 手动下载结果 |
+| `testConnection()` | 测试 API 连接 |
+| `clearTasksCache()` | 清除任务缓存 |
+| `getTasksForPaper(paperId)` | 获取论文相关任务 |
+
+---
+
+## [L8-06] MineruService 模块（主进程）
+
+### [L8-06-A] 职责
+MinerU API 调用、文件上传、任务轮询、结果下载、任务持久化。
+
+### [L8-06-B] 核心方法
+| 方法 | 说明 |
+|------|------|
+| `submitLocalOcrTask(params)` | 提交本地 PDF OCR 任务 |
+| `getTasksSnapshot()` | 获取所有任务快照 |
+| `downloadResult(localId)` | 手动触发结果下载 |
+| `clearTasksCache()` | 清除任务缓存 |
+| `testConnection()` | 测试 API 连接 |
+
+### [L8-06-C] 任务流程
+```
+1. 请求预签名上传 URL (POST /file-urls/batch)
+2. 上传 PDF 文件到 OSS (PUT)
+3. 任务进入 pending 状态
+4. 轮询批次状态 (GET /extract-results/batch/{batchId})
+5. 状态变化: pending → running → done
+6. 自动下载结果 ZIP
+```
+
+### [L8-06-D] 存储位置
+```
+{AppData}/
+├── .mineru-tasks.json           # 任务缓存
+└── MineruResults/               # 结果存储
+    └── {paperId}/
+        └── {localId}/
+            └── result.zip
+```
+
+---
+
 # [L9] API 参考
 
 ## [L9-01] IPC API 聚合
@@ -744,6 +1078,7 @@ interface IpcApi {
   system: SystemApi   // 系统配置
   library: LibraryApi // 论文库操作
   utils: UtilsApi     // 工具函数
+  mineru: MineruApi   // MinerU OCR
 }
 ```
 
@@ -808,6 +1143,19 @@ interface IpcApi {
 
 ---
 
+## [L9-05] MineruApi
+
+| 方法 | 签名 | 说明 |
+|------|------|------|
+| `submitLocalOcrTask` | `(params: SubmitOcrTaskParams) => Promise<MineruTask>` | 提交 OCR 任务 |
+| `getTasksSnapshot` | `() => Promise<MineruTask[]>` | 获取所有任务快照 |
+| `downloadResult` | `(localId: string) => Promise<void>` | 手动下载结果 |
+| `testConnection` | `() => Promise<{ success: boolean; message: string }>` | 测试 API 连接 |
+| `clearTasksCache` | `() => Promise<{ success: boolean; count: number }>` | 清除任务缓存 |
+| `onTaskUpdate` | `(callback) => () => void` | 订阅任务更新事件 |
+
+---
+
 # [L10] 开发指南
 
 ## [L10-01] 环境配置
@@ -858,3 +1206,44 @@ pnpm build:linux  # Linux
 - **Round 3**: 表现层扫描 - views/、components/
 - **Round 4**: Electron 层扫描 - ipc/、services/、preload/
 - **Round 5**: 整合校验 - [L4] 调用链路、[L5] 状态机、[L6] 数据链路、[L7] 时序图、[L8] 模块文档
+
+---
+
+## [L11-02] v1.1.0 (2024-12-02)
+
+### [L11-02-A] MinerU OCR 集成
+
+**新增功能**
+- 集成 MinerU API v4 OCR 服务
+- 实现 PDF 文档智能解析功能
+- 支持公式识别、表格识别、多语言 OCR
+
+**新增模块**
+- `stores/mineru-task/` - MinerU 任务状态管理
+- `services/mineru/` - MinerU 服务（主进程）
+- `ipc/mineru/` - MinerU IPC 通信
+- `apis/mineru/` - MinerU Preload API
+- `types/mineru/` - MinerU 类型定义
+
+**新增 UI**
+- `Dialog/progress-dialog/` - 任务进度对话框（手风琴布局）
+- `settings.content/extensions.vue` - 扩展设置页
+- `OverviewPanel.vue` - 单文件页 OCR 按钮
+- `topbar/index.vue` - 标题栏进度按钮
+
+**核心特性**
+- 任务提交与轮询机制
+- 实时进度跟踪
+- 自动结果下载
+- 任务持久化缓存
+- 清除缓存功能
+
+**技术实现**
+- 预签名 URL 文件上传
+- 批次状态轮询（可配置间隔 5-60 秒）
+- 结果存储：`{AppData}/MineruResults/{paperId}/{localId}/result.zip`
+- 任务缓存：`{AppData}/.mineru-tasks.json`
+
+**配置扩展**
+- `AppConfig.extensions.mineru` - MinerU 配置
+- 支持 API Key、模型版本、OCR 选项、语言等配置
