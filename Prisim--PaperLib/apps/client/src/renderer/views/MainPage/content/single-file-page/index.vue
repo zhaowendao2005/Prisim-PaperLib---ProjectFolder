@@ -423,9 +423,30 @@ onUnmounted(() => {
 }
 
 .paper-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--color-text-primary);
+  padding: 6px 12px;
+  max-width: 280px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-light);
+  border-radius: 6px;
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 1px 2px rgba(0, 0, 0, 0.04);
+  cursor: default;
+  transition: all 0.15s ease;
+}
+
+.paper-title:hover {
+  background-color: var(--color-bg-hover);
+  border-color: var(--color-border);
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 2px 4px rgba(0, 0, 0, 0.06);
 }
 
 .tool-btn {
