@@ -4,32 +4,32 @@
  * 论文列表视图（Tree / Flat）
  */
 import { ref, onMounted } from 'vue'
-import { useDataCardStore } from '@stores/home_datacard/home_datacard.store'
+import { useLibraryMetaStore } from '@stores/library-meta/library-meta.store'
 import { usePaperReaderStore } from '@stores/paper-reader/paper-reader.store'
-import type { Paper } from '@stores/home_datacard/home_datacard.datasource'
+import type { PaperMeta } from '@client&electron.share/types'
 
 type ViewMode = 'tree' | 'flat'
 
 const viewMode = ref<ViewMode>('tree')
-const store = useDataCardStore()
+const store = useLibraryMetaStore()
 const paperReaderStore = usePaperReaderStore()
 
 // 展开状态
 const expandedProjects = ref<Set<string>>(new Set(['1', '2', '3', '4', '5']))
 
-function toggleExpand(projectId: string) {
-  if (expandedProjects.value.has(projectId)) {
-    expandedProjects.value.delete(projectId)
+function toggleExpand(databaseId: string) {
+  if (expandedProjects.value.has(databaseId)) {
+    expandedProjects.value.delete(databaseId)
   } else {
-    expandedProjects.value.add(projectId)
+    expandedProjects.value.add(databaseId)
   }
 }
 
 // 点击论文节点
-function handlePaperClick(paper: Paper, projectId: string) {
+function handlePaperClick(paper: PaperMeta, databaseId: string) {
   paperReaderStore.openPaper(
     paper.id,
-    projectId,
+    databaseId,
     paper.pdfPath || '',
     paper.title
   )
@@ -37,7 +37,7 @@ function handlePaperClick(paper: Paper, projectId: string) {
 
 onMounted(() => {
   // 加载所有论文数据
-  store.fetchAllPapers()
+  store.loadAllPapers()
 })
 </script>
 
@@ -78,18 +78,18 @@ onMounted(() => {
       <!-- 树形视图 -->
       <template v-if="viewMode === 'tree'">
         <div 
-          v-for="project in store.dataCards" 
-          :key="project.id" 
+          v-for="db in store.databases" 
+          :key="db.id" 
           class="tree-node"
         >
           <!-- 项目节点 -->
           <div 
             class="project-node"
-            @click="toggleExpand(project.id)"
+            @click="toggleExpand(db.id)"
           >
             <svg 
               class="expand-icon" 
-              :class="{ expanded: expandedProjects.has(project.id) }"
+              :class="{ expanded: expandedProjects.has(db.id) }"
               fill="none" 
               stroke="currentColor" 
               viewBox="0 0 24 24"
@@ -99,20 +99,20 @@ onMounted(() => {
             <svg class="folder-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
             </svg>
-            <span class="node-name">{{ project.name }}</span>
-            <span class="paper-count">{{ project.paperCount }}</span>
+            <span class="node-name">{{ db.name }}</span>
+            <span class="paper-count">{{ db.paperCount }}</span>
           </div>
 
           <!-- 论文子节点 -->
           <div 
-            v-if="expandedProjects.has(project.id)" 
+            v-if="expandedProjects.has(db.id)" 
             class="paper-nodes"
           >
             <div 
-              v-for="paper in store.getPapersForProject(project.id)" 
+              v-for="paper in store.getPapersForDatabase(db.id)" 
               :key="paper.id" 
               class="paper-node"
-              @click="handlePaperClick(paper, project.id)"
+              @click="handlePaperClick(paper, db.id)"
             >
               <svg class="paper-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -126,10 +126,10 @@ onMounted(() => {
       <!-- 扁平视图 -->
       <template v-else>
         <div 
-          v-for="paper in store.papers" 
+          v-for="paper in store.allPapers" 
           :key="paper.id" 
           class="flat-paper-item"
-          @click="handlePaperClick(paper, paper.projectId || '')"
+          @click="handlePaperClick(paper, store.getPaperWithDatabase(paper.id)?.databaseId || '')"
         >
           <svg class="paper-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />

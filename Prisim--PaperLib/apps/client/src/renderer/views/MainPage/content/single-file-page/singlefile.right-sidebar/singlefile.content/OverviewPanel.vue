@@ -6,19 +6,21 @@
 import { computed } from 'vue'
 import type { PdfContentType } from '@client&electron.share/types'
 import { usePaperReaderStore } from '@stores/paper-reader/paper-reader.store'
-import { useDataCardStore } from '@stores/home_datacard/home_datacard.store'
+import { useLibraryMetaStore } from '@stores/library-meta/library-meta.store'
 
 const paperReaderStore = usePaperReaderStore()
-const dataCardStore = useDataCardStore()
+const libraryMetaStore = useLibraryMetaStore()
 
 // 当前阅读器状态
 const readerState = computed(() => paperReaderStore.activeReaderState)
 
-// 当前论文的完整信息（从 DataCardStore 获取）
-const currentPaper = computed(() => {
+// 当前论文的完整信息（从 LibraryMetaStore 获取）
+const currentPaperInfo = computed(() => {
   if (!readerState.value) return null
-  return dataCardStore.papers.find(p => p.id === readerState.value?.paperId) || null
+  return libraryMetaStore.getPaperWithDatabase(readerState.value.paperId)
 })
+
+const currentPaper = computed(() => currentPaperInfo.value?.paper || null)
 
 // 当前 PDF 类型
 const currentPdfType = computed(() => currentPaper.value?.pdfContentType || 'text-based')
@@ -32,13 +34,13 @@ const pdfTypeOptions: Array<{ value: PdfContentType; label: string; description:
 
 // 更新 PDF 类型
 async function updatePdfType(newType: PdfContentType) {
-  if (!readerState.value || !currentPaper.value) return
+  if (!readerState.value || !currentPaperInfo.value) return
   
   try {
-    // 调用后端 API 更新元数据
-    await window.api.library.updatePaperMeta(
-      currentPaper.value.projectId,
-      currentPaper.value.id,
+    // 通过 Store 更新元数据
+    await libraryMetaStore.updatePaperMeta(
+      currentPaperInfo.value.databaseId,
+      currentPaperInfo.value.paper.id,
       { pdfContentType: newType }
     )
     console.log('[OverviewPanel] PDF 类型已更新:', newType)

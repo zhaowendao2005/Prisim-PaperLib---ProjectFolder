@@ -1,42 +1,35 @@
 <script setup lang="ts">
 /**
  * HomePage 右侧栏 - 内容区
- * 显示选中数据卡片的概览信息和论文列表
+ * 显示选中数据库的概览信息和论文列表
  */
 import { ref, watch, computed } from 'vue'
-import { useDataCardStore } from '@stores/home_datacard/home_datacard.store'
 import { useLibraryMetaStore } from '@stores/library-meta/library-meta.store'
 import { usePaperReaderStore } from '@stores/paper-reader/paper-reader.store'
-import type { Paper } from '@stores/home_datacard/home_datacard.datasource'
-import { isElectron } from '@/core/utils/env'
+import type { PaperMeta } from '@client&electron.share/types'
 
-const store = useDataCardStore()
-const libraryMetaStore = isElectron() ? useLibraryMetaStore() : null
+const store = useLibraryMetaStore()
 const paperReaderStore = usePaperReaderStore()
 
-// 当前选中卡片的论文列表
-const papers = ref<Paper[]>([])
+// 加载状态
 const loadingPapers = ref(false)
 
 // 删除确认对话框
 const showDeleteConfirm = ref(false)
 const deleting = ref(false)
 
-// 获取当前选中卡片的论文
+// 获取当前选中数据库的论文
 const currentPapers = computed(() => {
-  if (!store.selectedCard) return []
-  return store.getPapersForProject(store.selectedCard.id)
+  if (!store.selectedDatabaseId) return []
+  return store.getPapersForDatabase(store.selectedDatabaseId)
 })
 
-// 监听选中卡片变化，加载论文
-watch(() => store.selectedCard, async (card) => {
-  if (!card) {
-    papers.value = []
-    return
-  }
+// 监听选中数据库变化，加载论文
+watch(() => store.selectedDatabaseId, async (databaseId) => {
+  if (!databaseId) return
   loadingPapers.value = true
   try {
-    await store.fetchPapersByProject(card.id)
+    await store.loadPapers(databaseId)
   } finally {
     loadingPapers.value = false
   }
@@ -55,9 +48,9 @@ function formatShortDate(date: Date) {
   return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
 }
 
-function getReadProgress(card: typeof store.selectedCard) {
-  if (!card || card.stats.totalPapers === 0) return 0
-  return Math.round((card.stats.readPapers / card.stats.totalPapers) * 100)
+function getReadProgress() {
+  // TODO: 实现阅读进度统计
+  return 0
 }
 
 function formatAuthors(authors: string[]) {
@@ -78,15 +71,15 @@ function handleDeleteClick() {
 }
 
 async function confirmDelete() {
-  if (!store.selectedCard || !libraryMetaStore) return
+  if (!store.selectedDatabaseId) return
   
   deleting.value = true
   try {
-    const cardId = store.selectedCard.id
+    const databaseId = store.selectedDatabaseId
     // 清除选中状态
-    store.clearCardSelection()
+    store.clearDatabaseSelection()
     // 删除数据库（同时删除文件）
-    await libraryMetaStore.removeDatabase(cardId, true)
+    await store.removeDatabase(databaseId, true)
   } catch (e) {
     console.error('[RightContent] 删除数据库失败:', e)
   } finally {
@@ -100,12 +93,12 @@ function cancelDelete() {
 }
 
 // 点击论文项
-function handlePaperClick(paper: Paper) {
-  if (!store.selectedCard) return
+function handlePaperClick(paper: PaperMeta) {
+  if (!store.selectedDatabaseId) return
   
   paperReaderStore.openPaper(
     paper.id,
-    store.selectedCard.id,
+    store.selectedDatabaseId,
     paper.pdfPath || '',
     paper.title
   )
@@ -114,24 +107,18 @@ function handlePaperClick(paper: Paper) {
 
 <template>
   <div class="right-content">
-    <!-- 有选中卡片时显示概览 -->
-    <template v-if="store.selectedCard">
+    <!-- 有选中数据库时显示概览 -->
+    <template v-if="store.selectedDatabase">
       <div class="overview-card">
         <!-- 标题 -->
-        <h3 class="overview-title">{{ store.selectedCard.name }}</h3>
+        <h3 class="overview-title">{{ store.selectedDatabase.name }}</h3>
         
-        <!-- 描述 -->
-        <p class="overview-desc">{{ store.selectedCard.description }}</p>
+        <!-- 路径 -->
+        <p class="overview-desc">{{ store.selectedDatabase.path }}</p>
         
-        <!-- 标签 -->
+        <!-- 标签占位 -->
         <div class="overview-tags">
-          <span 
-            v-for="tag in store.selectedCard.tags" 
-            :key="tag" 
-            class="tag"
-          >
-            {{ tag }}
-          </span>
+          <!-- TODO: 实现标签系统 -->
         </div>
 
         <!-- 分隔线 -->
@@ -140,19 +127,19 @@ function handlePaperClick(paper: Paper) {
         <!-- 统计信息 -->
         <div class="stats-grid">
           <div class="stat-item">
-            <span class="stat-value">{{ store.selectedCard.stats.totalPapers }}</span>
+            <span class="stat-value">{{ store.selectedDatabase.paperCount }}</span>
             <span class="stat-label">总论文</span>
           </div>
           <div class="stat-item">
-            <span class="stat-value">{{ store.selectedCard.stats.readPapers }}</span>
+            <span class="stat-value">0</span>
             <span class="stat-label">已阅读</span>
           </div>
           <div class="stat-item">
-            <span class="stat-value">{{ store.selectedCard.stats.annotatedPapers }}</span>
+            <span class="stat-value">0</span>
             <span class="stat-label">已标注</span>
           </div>
           <div class="stat-item">
-            <span class="stat-value">{{ getReadProgress(store.selectedCard) }}%</span>
+            <span class="stat-value">{{ getReadProgress() }}%</span>
             <span class="stat-label">阅读进度</span>
           </div>
         </div>
@@ -161,7 +148,7 @@ function handlePaperClick(paper: Paper) {
         <div class="progress-bar">
           <div 
             class="progress-fill" 
-            :style="{ width: getReadProgress(store.selectedCard) + '%' }"
+            :style="{ width: getReadProgress() + '%' }"
           />
         </div>
 
@@ -172,15 +159,11 @@ function handlePaperClick(paper: Paper) {
         <div class="time-info">
           <div class="time-item">
             <span class="time-label">创建时间</span>
-            <span class="time-value">{{ formatDate(store.selectedCard.createdAt) }}</span>
-          </div>
-          <div class="time-item">
-            <span class="time-label">更新时间</span>
-            <span class="time-value">{{ formatDate(store.selectedCard.updatedAt) }}</span>
+            <span class="time-value">{{ formatDate(new Date(store.selectedDatabase.createdAt)) }}</span>
           </div>
           <div class="time-item">
             <span class="time-label">上次打开</span>
-            <span class="time-value">{{ formatDate(store.selectedCard.stats.lastOpenedAt) }}</span>
+            <span class="time-value">{{ formatDate(new Date(store.selectedDatabase.lastOpenedAt)) }}</span>
           </div>
         </div>
 
@@ -244,10 +227,9 @@ function handlePaperClick(paper: Paper) {
                   <span v-if="paper.year" class="paper-year">{{ paper.year }}</span>
                 </div>
                 <div class="paper-footer">
-                  <span class="paper-date">{{ formatShortDate(paper.createdAt) }}</span>
+                  <span class="paper-date">{{ formatShortDate(new Date(paper.addedAt)) }}</span>
                   <div class="paper-badges">
-                    <span v-if="paper.isRead" class="badge read">已读</span>
-                    <span v-if="paper.isAnnotated" class="badge annotated">已标注</span>
+                    <!-- TODO: 实现阅读和标注状态 -->
                   </div>
                 </div>
               </div>
@@ -290,7 +272,7 @@ function handlePaperClick(paper: Paper) {
             </div>
             <h3 class="dialog-title">删除论文库</h3>
             <p class="dialog-message">
-              确定要删除「{{ store.selectedCard?.name }}」吗？<br>
+              确定要删除「{{ store.selectedDatabase?.name }}」吗？<br>
               <span class="warning">此操作将永久删除所有论文文件，无法恢复。</span>
             </p>
             <div class="dialog-actions">

@@ -4,7 +4,7 @@
  * 用于新建论文库/数据库
  */
 import { ref, computed } from 'vue'
-import { useDataCardStore } from '@stores/home_datacard/home_datacard.store'
+import { useLibraryMetaStore } from '@stores/library-meta/library-meta.store'
 
 const props = defineProps<{
   visible: boolean
@@ -15,7 +15,7 @@ const emit = defineEmits<{
   (e: 'created'): void
 }>()
 
-const store = useDataCardStore()
+const store = useLibraryMetaStore()
 
 // 表单数据
 const formData = ref({
@@ -76,10 +76,7 @@ async function handleSubmit() {
 
   isSubmitting.value = true
   try {
-    await store.createCard({
-      name: formData.value.name.trim(),
-      description: formData.value.description.trim() || '我的论文库'
-    })
+    await store.createDatabase(formData.value.name.trim())
     
     resetForm()
     emit('update:visible', false)

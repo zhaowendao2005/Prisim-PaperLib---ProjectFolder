@@ -4,13 +4,13 @@
  * 显示项目/数据库/论文库卡片
  */
 import { onMounted, ref, inject } from 'vue'
-import { useDataCardStore } from '@stores/home_datacard/home_datacard.store'
-import type { DataCard } from '@stores/home_datacard/home_datacard.datasource'
+import { useLibraryMetaStore } from '@stores/library-meta/library-meta.store'
+import type { PaperDatabase } from '@client&electron.share/types'
 import DropZone from '@/renderer/components/drop-zone/index.vue'
 import CreateProjectDialog from '@/renderer/components/create-project-dialog/index.vue'
 import { isElectron } from '@/core/utils/env'
 
-const store = useDataCardStore()
+const store = useLibraryMetaStore()
 
 // 注入展开右侧栏的方法
 const expandRightSidebar = inject<() => void>('expandRightSidebar')
@@ -30,19 +30,19 @@ function handleProjectCreated() {
 }
 
 // 右键选中卡片，显示概览并展开右侧栏
-function handleContextMenu(e: MouseEvent, card: DataCard) {
+function handleContextMenu(e: MouseEvent, db: PaperDatabase) {
   e.preventDefault()
-  store.selectCard(card)
+  store.selectDatabase(db.id)
   // 展开右侧栏显示元数据
   expandRightSidebar?.()
 }
 
-function formatDate(date: Date) {
-  return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
+function formatDate(timestamp: number) {
+  return new Date(timestamp).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
 }
 
 // 处理文件拖放（直接导入，不需要确认对话框，因为用户已明确选择目标库）
-async function handleFileDrop(files: File[], cardId: string) {
+async function handleFileDrop(files: File[], databaseId: string) {
   if (!isElectron()) {
     console.log('[ProjectDashboard] Web 模式下不支持文件导入')
     return
@@ -63,12 +63,12 @@ async function handleFileDrop(files: File[], cardId: string) {
     return
   }
 
-  console.log(`[ProjectDashboard] 导入 ${filePaths.length} 个文件到数据库 ${cardId}`)
-  await store.importPapers(cardId, filePaths)
+  console.log(`[ProjectDashboard] 导入 ${filePaths.length} 个文件到数据库 ${databaseId}`)
+  await store.importPapers(databaseId, filePaths)
 }
 
-function onDragEnter(cardId: string) {
-  dragTargetId.value = cardId
+function onDragEnter(databaseId: string) {
+  dragTargetId.value = databaseId
 }
 
 function onDragLeave() {
@@ -76,7 +76,7 @@ function onDragLeave() {
 }
 
 onMounted(() => {
-  store.fetchDataCards()
+  store.fetchDatabases()
 })
 </script>
 
@@ -95,21 +95,21 @@ onMounted(() => {
 
       <!-- 项目卡片列表 -->
       <DropZone
-        v-for="card in store.dataCards"
-        :key="card.id"
+        v-for="db in store.databases"
+        :key="db.id"
         accept=".pdf"
-        :overlay-text="`释放以导入到 ${card.name}`"
-        @drop="(files) => handleFileDrop(files, card.id)"
-        @dragenter="onDragEnter(card.id)"
+        :overlay-text="`释放以导入到 ${db.name}`"
+        @drop="(files) => handleFileDrop(files, db.id)"
+        @dragenter="onDragEnter(db.id)"
         @dragleave="onDragLeave"
       >
         <div
           class="project-card"
           :class="{ 
-            selected: store.selectedCard?.id === card.id,
-            'drag-over': dragTargetId === card.id
+            selected: store.selectedDatabaseId === db.id,
+            'drag-over': dragTargetId === db.id
           }"
-          @contextmenu="handleContextMenu($event, card)"
+          @contextmenu="handleContextMenu($event, db)"
         >
         <div class="card-icon">
           <!-- 数据库图标 -->
@@ -155,10 +155,10 @@ onMounted(() => {
           </svg>
         </div>
         <div class="card-content">
-          <h3 class="card-title">{{ card.name }}</h3>
+          <h3 class="card-title">{{ db.name }}</h3>
           <div class="card-meta">
-            <span class="paper-count">{{ card.paperCount }} 篇论文</span>
-            <span class="update-time">{{ formatDate(card.updatedAt) }}</span>
+            <span class="paper-count">{{ db.paperCount }} 篇论文</span>
+            <span class="update-time">{{ formatDate(db.lastOpenedAt) }}</span>
           </div>
         </div>
         </div>
