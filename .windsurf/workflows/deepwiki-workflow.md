@@ -1,6 +1,6 @@
 ---
 description: auto_execution_mode: 1
-auto_execution_mode: 3
+auto_execution_mode: 1
 ---
 
 # DeepWiki 工作流提示词
