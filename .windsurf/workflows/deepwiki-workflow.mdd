@@ -1,0 +1,710 @@
+---
+description: 
+auto_execution_mode: 1
+---
+
+# DeepWiki 工作流提示词
+
+```markdown
+<!-- DEEPWIKI-WORKFLOW v1.0 -->
+# 📚 DeepWiki 维护工作流
+
+## 🎯 工作模式判定
+
+当用户提及 wiki/文档/DeepWiki 相关操作时，按以下优先级执行：
+
+### 优先级规则
+1. **P0 - 用户明确指令**：用户明确说明要做什么 → 直接执行
+2. **P1 - 智能判断**：用户未明确 → 自动判定场景 → **行动前先告知用户准备做什么，等待确认**
+
+---
+
+## 🔍 场景自动判定流程
+
+```
+START
+  │
+  ├─ 检查 wiki 文件是否存在？
+  │   │
+  │   ├─ 否 → 【场景A: 初始化模式】
+  │   │
+  │   └─ 是 → 检查是否有未记录的变更？
+  │           │
+  │           ├─ 是 → 【场景B: 扩展与修正模式】
+  │           │
+  │           └─ 否 → 【场景C: 查询/浏览模式】
+  │
+END
+```
+
+---
+
+## 📋 场景A: 初始化模式
+
+### 触发条件
+- wiki 文件不存在
+- 用户明确要求"创建/初始化 wiki"
+
+### 执行流程
+
+#### 第一轮：规模评估
+
+**📋 命令速查：项目规模评估**
+```powershell
+# 1. 统计源文件数量
+(Get-ChildItem -Recurse -Include *.ts,*.vue,*.py | Where-Object { 
+  $_.FullName -notmatch 'node_modules|dist|\.git|Reference' 
+}).Count
+
+# 2. 获取目录结构（排除无关目录）
+Get-ChildItem -Recurse -Directory | Where-Object {
+  $_.FullName -notmatch 'node_modules|\.git|dist|Reference|@'
+} | Select-Object -First 100 | ForEach-Object { $_.FullName }
+```
+
+#### 输出：扫描计划
+```
+📊 项目规模评估：
+- 源文件数量: XXX
+- 预计扫描轮次: N 轮
+
+📝 扫描计划 (TODO):
+□ [Round 1] 核心架构扫描 - 入口文件、配置文件、类型定义
+□ [Round 2] 模块扫描 - stores/, services/, components/
+□ [Round 3] 视图层扫描 - views/, pages/
+□ [Round 4] 后端扫描 - electron/, backend/
+□ [Round 5] 整合与校验
+
+是否开始执行？请输入 "继续" 或指定从哪一轮开始。
+```
+
+#### 后续轮次：逐步扫描
+每轮完成后更新进度，直到 wiki 初始化完成。
+
+---
+
+## 📋 场景B: 扩展与修正模式
+
+### 触发条件
+- wiki 文件存在
+- 检测到 git 有未记录的变更
+
+### 执行流程
+
+#### Step 1: 读取版本记录
+
+**📋 命令速查：读取版本记录**
+```powershell
+# 读取 wiki 中的版本记录区，获取上次记录的 commit hash
+Select-String -Path wiki.md -Pattern "^## \[VERSION-RECORD\]" -Context 0,5
+```
+
+#### Step 2: 获取变更范围
+
+**📋 命令速查：获取变更文件**
+```powershell
+# 获取从上次记录 commit 到当前的所有变更文件
+# LAST_COMMIT 从版本记录区读取
+git diff --name-only <LAST_COMMIT> HEAD
+git diff --name-only --cached  # 暂存区
+git diff --name-only           # 工作区
+```
+
+#### Step 3: 过滤无关文件
+```
+排除规则（仅看路径，不读内容）：
+├─ Reference/**          # 参考项目
+├─ node_modules/**       # 依赖
+├─ dist/**               # 构建产物
+├─ *.lock                # 锁文件
+├─ .git/**               # Git 内部
+├─ @*/**                 # 临时/缓存目录
+└─ *.log, *.tmp          # 临时文件
+```
+
+#### Step 4: 分析变更并定位
+
+**📋 命令速查：分析变更**
+```powershell
+# 对过滤后的文件，查看具体 diff
+git diff <LAST_COMMIT> HEAD -- <file_path>
+
+# 在 wiki 中定位相关章节
+Select-String -Path wiki.md -Pattern "^#.*\[L" | Select-String "<模块关键词>"
+```
+
+#### Step 5: 输出变更计划
+```
+📝 检测到以下变更需要同步到 wiki：
+
+变更文件 (已过滤 N 个无关文件):
+  - stores/library-meta/library-meta.store.ts [Modified]
+  - components/create-project-dialog/index.vue [Modified]
+  - stores/home_datacard/ [Deleted]
+
+影响的 wiki 章节：
+  - [L4-01] library-meta 模块 → 需更新
+  - [L6-02] LibraryMetaStore → 需更新
+  - [L4-XX] home_datacard 模块 → 需删除
+
+计划操作：
+  1. 更新 [L4-01-B] 状态结构
+  2. 更新 [L6-02-C] Actions 列表
+  3. 删除 [L4-XX] home_datacard 相关章节
+  4. 追加 [L8-XX] 变更日志
+
+是否执行？
+```
+
+---
+
+## 📋 场景C: 查询/浏览模式
+
+### 触发条件
+- wiki 存在且无未记录变更
+- 用户询问项目相关问题
+
+### 执行流程
+
+**📋 命令速查：查询浏览**
+```powershell
+# 1. 获取文档结构
+Select-String -Path wiki.md -Pattern "^#" | Select-Object -First 50
+
+# 2. 定位目标章节
+Select-String -Path wiki.md -Pattern "^#.*<用户关键词>"
+
+# 3. 精准读取（使用 Cascade 工具）
+read_file wiki.md --offset <行号> --limit <范围>
+```
+
+---
+
+## 📄 Wiki 文件头部模板
+
+```markdown
+<!-- DEEPWIKI: <项目名> -->
+<!-- AI-HINT: 使用 grep "^#" 获取目录结构 -->
+
+# [ROOT] <项目名> 技术文档
+> 自动生成 | 请勿手动编辑元数据区
+
+## [VERSION-RECORD]
+<!-- 版本记录区 - AI 自动维护 -->
+| 序号 | 日期 | Commit | 分支 | 摘要 |
+|------|------|--------|------|------|
+| 001 | 2024-12-01 | abc1234 | main | 初始化文档 |
+| 002 | 2024-12-01 | def5678 | main | 重构 LibraryMetaStore |
+<!-- /VERSION-RECORD -->
+
+## [TOC]
+<!-- 目录区 -->
+...
+```
+
+---
+
+## ⚙️ AI 行为准则
+
+1. **先分析后行动**：任何非用户明确指令的操作，先输出计划等待确认
+2. **最小读取原则**：
+   - 结构判断 → 只读标题
+   - 内容分析 → 只读目标段落
+   - 避免一次性读取整个大文件
+3. **精准编辑原则**：
+   - 使用行号定位
+   - 仅修改目标区块
+   - 保持其他内容不变
+4. **版本追踪**：每次修改后更新 [VERSION-RECORD]
+
+---
+
+## 🔧 PowerShell 命令速查总表
+
+### 文档操作
+| 操作 | PowerShell 命令 |
+|------|------------------|
+| 获取目录结构 | `Select-String -Path wiki.md -Pattern "^#"` |
+| 定位章节（带行号） | `Select-String -Path wiki.md -Pattern "^#.*\[L4-01\]"` |
+| 搜索关键词 | `Select-String -Path wiki.md -Pattern "<关键词>"` |
+| 读取指定行 | `Get-Content wiki.md \| Select-Object -Skip <起始行> -First <行数>` |
+
+### Git 操作
+| 操作 | 命令 |
+|------|------|
+| 获取变更文件 | `git diff --name-only <commit> HEAD` |
+| 查看文件 diff | `git diff <commit> HEAD -- <path>` |
+| 当前分支 | `git branch --show-current` |
+| 最新 commit | `git rev-parse --short HEAD` |
+| 暂存区变更 | `git diff --name-only --cached` |
+| 工作区变更 | `git diff --name-only` |
+
+### 项目分析
+| 操作 | PowerShell 命令 |
+|------|------------------|
+| 统计文件数 | `(Get-ChildItem -Recurse -Include *.ts,*.vue \| Where-Object { $_.FullName -notmatch 'node_modules' }).Count` |
+| 获取目录树 | `Get-ChildItem -Recurse -Directory \| Where-Object { $_.FullName -notmatch 'node_modules\|dist' }` |
+| 查找文件 | `Get-ChildItem -Recurse -Filter "*.ts" \| Select-Object FullName` |
+
+# 大纲模版
+
+# DeepWiki 文档大纲模板
+
+## 📐 通用架构
+
+```
+<!-- DEEPWIKI: <项目名> -->
+<!-- AI-HINT: 使用 Select-String -Pattern "^#" 获取目录结构 -->
+
+# [ROOT] <项目名> 技术文档
+> 版本: 1.0.0 | 最后更新: YYYY-MM-DD
+
+---
+
+## [VERSION-RECORD]
+<!-- 版本记录区 - AI 自动维护 -->
+| 序号 | 日期 | Commit | 分支 | 摘要 |
+|------|------|--------|------|------|
+| 001 | YYYY-MM-DD | xxxxxxx | main | 初始化文档 |
+<!-- /VERSION-RECORD -->
+
+---
+
+## [TOC] 目录
+
+- [L1] 项目概述
+- [L2] 架构总览
+- [L3] 数据模型
+- [L4] 调用链路
+- [L5] 状态机
+- [L6] 数据链路
+- [L7] 时序图
+- [L8] 模块文档
+- [L9] API 参考
+- [L10] 开发指南
+- [L11] 变更日志
+
+---
+
+# [L1] 项目概述
+
+## [L1-01] 项目定位
+<!-- 一句话描述项目是什么 -->
+
+## [L1-02] 技术栈
+<!-- 列出核心技术选型 -->
+
+## [L1-03] 目录结构
+<!-- 项目文件组织 -->
+
+---
+
+# [L2] 架构总览
+
+## [L2-01] 系统架构图
+<!-- 整体架构的 Mermaid 图 -->
+
+## [L2-02] 分层设计
+<!-- 表现层 / 业务层 / 数据层 / 基础设施层 -->
+
+## [L2-03] 进程/线程模型
+<!-- 如有多进程/多线程，描述其职责 -->
+
+---
+
+# [L3] 数据模型
+
+## [L3-01] 核心实体
+<!-- 主要数据结构定义 -->
+
+## [L3-02] 实体关系图
+```mermaid
+erDiagram
+    EntityA ||--o{ EntityB : contains
+    EntityB ||--|| EntityC : references
+```
+
+## [L3-03] 存储结构
+<!-- 数据库表/文件结构 -->
+
+---
+
+# [L4] 调用链路
+
+## [L4-01] 概述
+<!-- 调用链路的整体说明 -->
+
+## [L4-02] 核心链路图
+```mermaid
+graph LR
+    subgraph 表现层
+        A[UI Component]
+    end
+    subgraph 业务层
+        B[Store/Service]
+    end
+    subgraph 数据层
+        C[DataSource]
+    end
+    subgraph 基础设施
+        D[API/IPC/DB]
+    end
+    
+    A -->|调用| B
+    B -->|调用| C
+    C -->|调用| D
+    D -.->|响应| C
+    C -.->|响应| B
+    B -.->|更新| A
+```
+
+## [L4-03] 链路详解
+
+### [L4-03-A] 链路: <功能名称1>
+<!-- 描述具体功能的完整调用路径 -->
+```
+触发点 → 组件方法 → Store Action → DataSource → 后端API → 响应回传
+```
+
+### [L4-03-B] 链路: <功能名称2>
+<!-- 另一个核心功能的调用链路 -->
+
+---
+
+# [L5] 状态机
+
+## [L5-01] 概述
+<!-- 状态管理的整体设计 -->
+
+## [L5-02] 全局状态结构
+```
+AppState
+├── ModuleA
+│   ├── loading: boolean
+│   ├── data: T[]
+│   └── error: Error | null
+├── ModuleB
+│   └── ...
+└── UI
+    ├── currentView: string
+    └── ...
+```
+
+## [L5-03] 状态机图
+
+### [L5-03-A] <模块A> 状态机
+```mermaid
+stateDiagram-v2
+    [*] --> Idle
+    Idle --> Loading : 触发加载
+    Loading --> Success : 加载成功
+    Loading --> Error : 加载失败
+    Success --> Idle : 重置
+    Error --> Loading : 重试
+    Error --> Idle : 取消
+```
+
+### [L5-03-B] <模块B> 状态机
+<!-- 另一个模块的状态流转 -->
+
+## [L5-04] 状态变更规则
+<!-- 描述状态变更的触发条件和副作用 -->
+
+---
+
+# [L6] 数据链路
+
+## [L6-01] 概述
+<!-- 数据如何在系统中流动 -->
+
+## [L6-02] 数据流向图
+```mermaid
+flowchart TD
+    subgraph 数据源
+        S1[(数据库)]
+        S2[(文件系统)]
+        S3[外部API]
+    end
+    
+    subgraph 数据层
+        D1[DataSource]
+        D2[Cache]
+    end
+    
+    subgraph 业务层
+        B1[Store]
+        B2[Service]
+    end
+    
+    subgraph 表现层
+        V1[Component]
+        V2[View]
+    end
+    
+    S1 & S2 & S3 --> D1
+    D1 <--> D2
+    D1 --> B1
+    B1 <--> B2
+    B1 --> V1 & V2
+    
+    V1 & V2 -->|用户操作| B1
+    B1 -->|写入| D1
+    D1 -->|持久化| S1 & S2
+```
+
+## [L6-03] 数据同步机制
+<!-- 描述数据如何保持一致性 -->
+
+### [L6-03-A] 读取流程
+### [L6-03-B] 写入流程
+### [L6-03-C] 缓存策略
+### [L6-03-D] 事件通知
+
+---
+
+# [L7] 时序图
+
+## [L7-01] 核心场景时序
+
+### [L7-01-A] 场景: <初始化流程>
+```mermaid
+sequenceDiagram
+    participant U as 用户
+    participant V as View
+    participant S as Store
+    participant D as DataSource
+    participant B as Backend
+    
+    U->>V: 打开应用
+    V->>S: 初始化Store
+    S->>D: 请求数据
+    D->>B: API调用
+    B-->>D: 返回数据
+    D-->>S: 更新状态
+    S-->>V: 触发渲染
+    V-->>U: 显示界面
+```
+
+### [L7-01-B] 场景: <CRUD操作>
+```mermaid
+sequenceDiagram
+    participant U as 用户
+    participant V as View
+    participant S as Store
+    participant D as DataSource
+    participant B as Backend
+    
+    U->>V: 提交表单
+    V->>S: 调用Action
+    S->>D: 发送请求
+    D->>B: API调用
+    B-->>B: 处理业务逻辑
+    B-->>D: 返回结果
+    D-->>S: 更新本地状态
+    S-->>V: 通知变更
+    V-->>U: 显示结果
+```
+
+### [L7-01-C] 场景: <实时同步>
+<!-- 如有 WebSocket/事件订阅等场景 -->
+
+---
+
+# [L8] 模块文档
+
+## [L8-01] <模块A>
+### [L8-01-A] 职责
+### [L8-01-B] 接口
+### [L8-01-C] 状态
+### [L8-01-D] 依赖关系
+
+## [L8-02] <模块B>
+### [L8-02-A] 职责
+### [L8-02-B] 接口
+### [L8-02-C] 状态
+### [L8-02-D] 依赖关系
+
+<!-- 按需添加更多模块 -->
+
+---
+
+# [L9] API 参考
+
+## [L9-01] 内部 API
+### [L9-01-A] <API分类1>
+### [L9-01-B] <API分类2>
+
+## [L9-02] 外部 API
+### [L9-02-A] <外部服务1>
+### [L9-02-B] <外部服务2>
+
+---
+
+# [L10] 开发指南
+
+## [L10-01] 环境配置
+## [L10-02] 开发规范
+## [L10-03] 新增模块流程
+## [L10-04] 调试技巧
+## [L10-05] 常见问题
+
+---
+
+# [L11] 变更日志
+
+## [L11-01] v1.0.0 (YYYY-MM-DD)
+### [L11-01-A] 新增
+### [L11-01-B] 修改
+### [L11-01-C] 删除
+
+<!-- 按版本追加 -->
+```
+
+---
+
+## 📋 大纲设计说明
+
+| 章节 | 核心内容 | Mermaid 图类型 |
+|------|----------|----------------|
+| **[L4] 调用链路** | 函数/方法间的调用关系 | `graph LR/TD` |
+| **[L5] 状态机** | 状态流转、触发条件 | `stateDiagram-v2` |
+| **[L6] 数据链路** | 数据读写流向、缓存策略 | `flowchart TD` |
+| **[L7] 时序图** | 多组件协作的时间顺序 | `sequenceDiagram` |
+
+---
+
+## 📐 标题层级规范 (3-5级)
+
+### 何时使用 3 级标题 `###`
+
+**使用场景：**
+- 在 2 级标题下，需要对内容进行**分类**或**分组**时
+- 同一主题下有**多个并列的子概念**需要展开
+- 需要为某个功能/模块提供**多个维度的说明**
+
+**示例：**
+```
+## [L4-03] 链路详解
+### [L4-03-A] 链路: 用户登录
+### [L4-03-B] 链路: 数据导入
+### [L4-03-C] 链路: 实时同步
+```
+
+**判断标准：**
+- ✅ 有 2 个以上的并列子主题
+- ✅ 每个子主题都有独立的内容（不只是一句话）
+- ❌ 如果只有 1 个子主题，考虑直接在 2 级标题下展开
+
+---
+
+### 何时使用 4 级标题 `####`
+
+**使用场景：**
+- 在 3 级标题下，需要进一步**细化步骤**或**拆解流程**
+- 某个子概念内部有**多个组成部分**需要逐一说明
+- 需要对某个功能进行**分阶段描述**（如：准备 → 执行 → 验证）
+
+**示例：**
+```
+### [L6-03-A] 读取流程
+#### 步骤 1: 检查缓存
+#### 步骤 2: 查询数据源
+#### 步骤 3: 更新本地状态
+#### 步骤 4: 触发 UI 更新
+```
+
+**判断标准：**
+- ✅ 3 级标题的内容需要**分步骤**或**分阶段**说明
+- ✅ 每个步骤/阶段有明确的输入输出或前后依赖
+- ❌ 如果只是简单列举，用无序列表 `-` 即可
+
+---
+
+### 何时使用 5 级标题 `#####`
+
+**使用场景：**
+- 在 4 级标题下，需要对某个步骤进行**极细粒度的拆解**
+- 某个技术细节需要**多个子项**逐一解释（如：参数说明、配置项）
+- 需要对某个概念提供**多个示例**或**多种实现方式**
+
+**示例：**
+```
+#### 步骤 2: 查询数据源
+##### 2.1 构造查询条件
+##### 2.2 执行 SQL 查询
+##### 2.3 解析查询结果
+##### 2.4 错误处理
+```
+
+**判断标准：**
+- ✅ 4 级标题的某个步骤内部逻辑复杂，需要进一步拆解
+- ✅ 有明确的子步骤编号（如 2.1, 2.2）
+- ❌ 避免过度拆解，5 级标题应该是**最细粒度**
+
+---
+
+## 🚫 避免的反模式
+
+### 反模式 1: 单子节点
+```
+❌ 错误示例：
+## [L4-03] 链路详解
+### [L4-03-A] 链路: 用户登录
+（只有一个 3 级标题）
+
+✅ 正确做法：
+## [L4-03] 链路详解: 用户登录
+（直接在 2 级标题下展开，不需要 3 级）
+```
+
+### 反模式 2: 过度嵌套
+```
+❌ 错误示例：
+### [L6-03-A] 读取流程
+#### 步骤 1: 检查缓存
+##### 1.1 读取内存缓存
+###### 1.1.1 检查缓存键
+（嵌套过深，难以维护）
+
+✅ 正确做法：
+### [L6-03-A] 读取流程
+#### 步骤 1: 检查缓存
+- 读取内存缓存
+- 检查缓存键
+- 验证缓存有效性
+（用列表代替过深嵌套）
+```
+
+### 反模式 3: 标题内容过于简单
+```
+❌ 错误示例：
+#### 概述
+（标题下只有一句话）
+
+✅ 正确做法：
+直接在上级标题下用段落说明，不需要单独开标题
+```
+
+---
+
+## 📏 标题层级决策树
+
+```
+需要新增内容？
+│
+├─ 是否有 2+ 个并列主题？
+│   ├─ 是 → 使用 ### (3级)
+│   └─ 否 → 在当前层级用段落/列表
+│
+├─ 某个主题需要分步骤？
+│   ├─ 是 → 使用 #### (4级)
+│   └─ 否 → 用列表即可
+│
+└─ 某个步骤需要极细拆解？
+    ├─ 是 → 使用 ##### (5级)
+    └─ 否 → 用列表或代码块
+```
+
+---
+
+
