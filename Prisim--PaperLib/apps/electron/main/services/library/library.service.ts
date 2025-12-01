@@ -11,9 +11,11 @@ import type {
   PaperIndex,
   Tag,
   TagIndex,
-  FileChangeEvent
+  FileChangeEvent,
+  PdfContentType
 } from '@client&electron.share/types/library/library.type'
 import { getPaths } from '../system/system.service'
+import { detectPdfContentType } from './pdf-type-detector'
 // 注意：文件监听由 IPC 层（library.ipc.ts）独立管理
 
 // ===== 常量 =====
@@ -307,8 +309,8 @@ export function getPaper(databaseId: string, paperId: string): PaperMeta | null 
   return meta ? fillPdfPath(databasePath, meta) : null
 }
 
-/** 导入论文 */
-export function importPapers(databaseId: string, filePaths: string[]): PaperMeta[] {
+/** 导入论文（异步，支持 PDF 类型检测） */
+export async function importPapers(databaseId: string, filePaths: string[]): Promise<PaperMeta[]> {
   const databasePath = getDatabasePath(databaseId)
   const index = loadIndex(databasePath)
   const importedPapers: PaperMeta[] = []
@@ -337,6 +339,14 @@ export function importPapers(databaseId: string, filePaths: string[]): PaperMeta
     const destPath = join(paperDir, filename)
     copyFileSync(filePath, destPath)
 
+    // 检测 PDF 内容类型
+    let pdfContentType: PdfContentType = 'text-based'
+    try {
+      pdfContentType = await detectPdfContentType(destPath)
+    } catch (error) {
+      console.error('[LibraryService] PDF 类型检测失败:', error)
+    }
+
     // 删除原文件（如果在 _imports 目录中）
     if (filePath.includes(IMPORTS_DIR)) {
       try {
@@ -346,7 +356,7 @@ export function importPapers(databaseId: string, filePaths: string[]): PaperMeta
       }
     }
 
-    // 创建元数据
+    // 创建元数据（包含 pdfContentType）
     const now = Date.now()
     const meta: PaperMeta = {
       id,
@@ -357,7 +367,8 @@ export function importPapers(databaseId: string, filePaths: string[]): PaperMeta
       tags: [],
       fileSize: stat.size,
       addedAt: now,
-      updatedAt: now
+      updatedAt: now,
+      pdfContentType
     }
 
     // 保存 meta.json (不包含 pdfPath,因为是运行时计算的)

@@ -44,7 +44,8 @@ function mapMetaToPaper(meta: PaperMeta, projectId: string): Paper {
     isRead: false,
     isAnnotated: false,
     createdAt: new Date(meta.addedAt),
-    updatedAt: new Date(meta.updatedAt)
+    updatedAt: new Date(meta.updatedAt),
+    pdfContentType: meta.pdfContentType
   }
 }
 

@@ -2,6 +2,7 @@
  * Home DataCard 数据源接口
  * 首页数据卡片（项目/数据库/论文库）及论文
  */
+import type { PdfContentType } from '@client&electron.share/types'
 
 /** 论文实体 */
 export interface Paper {
@@ -17,6 +18,8 @@ export interface Paper {
   isAnnotated: boolean
   createdAt: Date
   updatedAt: Date
+  /** PDF 内容类型 */
+  pdfContentType?: PdfContentType
 }
 
 /** 数据卡片实体 */

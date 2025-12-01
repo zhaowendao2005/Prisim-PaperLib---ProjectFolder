@@ -41,6 +41,9 @@ export interface DatabaseCreateInput {
 
 // ===== 论文 =====
 
+/** PDF 内容类型 */
+export type PdfContentType = 'text-based' | 'image-based' | 'structured'
+
 /** 论文元数据 */
 export interface PaperMeta {
   /** UUID 短码（8位） */
@@ -67,6 +70,8 @@ export interface PaperMeta {
   addedAt: number
   /** 更新时间戳 */
   updatedAt: number
+  /** PDF 内容类型（导入时自动检测，可手动修改） */
+  pdfContentType?: PdfContentType
 
   // UI 临时状态（不持久化）
   /** 新添加标记 */

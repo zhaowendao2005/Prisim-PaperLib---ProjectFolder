@@ -4,6 +4,7 @@
  * 默认折叠，带非线性动画
  * 展开按钮已移至 Topbar
  */
+import { ref } from 'vue'
 import RightNavbar from './singlefile.navbar/index.vue'
 import RightContent from './singlefile.content/index.vue'
 
@@ -15,6 +16,15 @@ defineProps<{
 const emit = defineEmits<{
   startResize: [e: MouseEvent]
 }>()
+
+// 标签配置
+const tabs = [
+  { id: 'overview', label: '概览' },
+  { id: 'notes', label: '笔记' }
+]
+
+// 当前激活的标签
+const activeTab = ref('overview')
 </script>
 
 <template>
@@ -32,8 +42,12 @@ const emit = defineEmits<{
       :style="{ width: collapsed ? '0px' : width + 'px' }"
     >
       <template v-if="!collapsed">
-        <RightNavbar />
-        <RightContent />
+        <RightNavbar 
+          :tabs="tabs" 
+          :active-tab="activeTab" 
+          @update:active-tab="activeTab = $event" 
+        />
+        <RightContent :active-tab="activeTab" />
       </template>
     </aside>
   </div>

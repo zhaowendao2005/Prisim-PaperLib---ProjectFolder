@@ -19,6 +19,7 @@ export type {
   DatabaseCreateInput,
   PaperMeta,
   PaperIndex,
+  PdfContentType,
   Tag,
   TagIndex,
   FileChangeType,
