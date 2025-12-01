@@ -2,12 +2,13 @@
 /**
  * Single File Page - PDF 阅读器页面
  */
-import { ref, computed, watch, onMounted, nextTick, shallowRef } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, shallowRef } from 'vue'
 import { usePaperReaderStore } from '@stores/paper-reader/paper-reader.store'
 import * as pdfjsLib from 'pdfjs-dist'
+import { EventBus, PDFSinglePageViewer, PDFLinkService } from 'pdfjs-dist/web/pdf_viewer.mjs'
+import 'pdfjs-dist/web/pdf_viewer.css'
 
-// 配置 PDF.js worker - 使用本地安装的 worker
-// Vite 会自动处理 node_modules 中的文件
+// 配置 PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
   import.meta.url
@@ -19,12 +20,14 @@ const paperReaderStore = usePaperReaderStore()
 // 当前激活的阅读器状态
 const readerState = computed(() => paperReaderStore.activeReaderState)
 
-// PDF 相关状态
-const canvasRef = ref<HTMLCanvasElement | null>(null)
-// 使用 shallowRef 避免深度响应式破坏 PDF.js 内部私有字段
-const pdfDocument = shallowRef<pdfjsLib.PDFDocumentProxy | null>(null)
+// PDF Viewer 相关
+const viewerContainerRef = ref<HTMLDivElement | null>(null)
+const viewerRef = ref<HTMLDivElement | null>(null)
+const pdfViewer = shallowRef<PDFSinglePageViewer | null>(null)
+const eventBus = shallowRef<EventBus | null>(null)
+const pdfLinkService = shallowRef<PDFLinkService | null>(null)
 const renderError = ref<string | null>(null)
-const loadedPaperId = ref<string | null>(null)  // 记录已加载的 paperId
+const loadedPaperId = ref<string | null>(null)
 
 // 监听 pdfPath 变化,直接加载 PDF
 watch(
@@ -47,6 +50,77 @@ watch(
 )
 
 /**
+ * 初始化 PDF Viewer
+ */
+function initPDFViewer() {
+  if (!viewerContainerRef.value || !viewerRef.value) return
+  
+  console.log('[PDF] 初始化 PDFSinglePageViewer')
+  
+  // 创建 EventBus
+  eventBus.value = new EventBus()
+  
+  // 创建 LinkService
+  pdfLinkService.value = new PDFLinkService({
+    eventBus: eventBus.value
+  })
+  
+  // 创建 PDFSinglePageViewer
+  pdfViewer.value = new PDFSinglePageViewer({
+    container: viewerContainerRef.value,
+    viewer: viewerRef.value,
+    eventBus: eventBus.value,
+    linkService: pdfLinkService.value
+  })
+  
+  pdfLinkService.value.setViewer(pdfViewer.value)
+  
+  // 添加 Ctrl+滚轮缩放支持
+  setupWheelZoom()
+  
+  console.log('[PDF] PDFSinglePageViewer 初始化完成')
+}
+
+/**
+ * 设置滚轮缩放
+ */
+function setupWheelZoom() {
+  if (!viewerContainerRef.value || !pdfViewer.value) return
+  
+  const container = viewerContainerRef.value
+  
+  const handleWheel = (evt: WheelEvent) => {
+    // 检查是否按下 Ctrl 或 Meta 键
+    if (evt.ctrlKey || evt.metaKey) {
+      evt.preventDefault()
+      
+      // 计算缩放方向
+      const delta = evt.deltaY
+      const ticks = delta > 0 ? -1 : 1
+      
+      // 使用 PDFViewer 的缩放方法
+      if (pdfViewer.value) {
+        if (ticks > 0) {
+          pdfViewer.value.increaseScale()
+        } else {
+          pdfViewer.value.decreaseScale()
+        }
+      }
+    }
+  }
+  
+  container.addEventListener('wheel', handleWheel, { passive: false })
+  
+  // 清理函数
+  const cleanup = () => {
+    container.removeEventListener('wheel', handleWheel)
+  }
+  
+  // 保存清理函数供 onUnmounted 使用
+  ;(container as any)._wheelCleanup = cleanup
+}
+
+/**
  * 从路径加载 PDF
  */
 async function loadPDFFromPath(pdfPath: string) {
@@ -58,7 +132,26 @@ async function loadPDFFromPath(pdfPath: string) {
     const arrayBuffer = await window.api.pdf.readPDF(pdfPath)
     console.log('[PDF] PDF 数据读取成功:', arrayBuffer.byteLength, 'bytes')
     
-    await loadPDF(arrayBuffer)
+    // 加载 PDF 文档
+    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer })
+    const pdfDocument = await loadingTask.promise
+    
+    console.log('[PDF] 文档加载成功,总页数:', pdfDocument.numPages)
+    
+    // 更新总页数
+    if (readerState.value) {
+      paperReaderStore.setTotalPages(
+        readerState.value.paperId,
+        pdfDocument.numPages
+      )
+    }
+    
+    // 设置文档到 viewer
+    if (pdfViewer.value && pdfLinkService.value) {
+      pdfLinkService.value.setDocument(pdfDocument)
+      pdfViewer.value.setDocument(pdfDocument)
+      console.log('[PDF] ✅ 文档已设置到 viewer')
+    }
   } catch (error) {
     console.error('[PDF] 从路径加载失败:', error)
     renderError.value = error instanceof Error ? error.message : '加载失败'
@@ -66,130 +159,46 @@ async function loadPDFFromPath(pdfPath: string) {
 }
 
 /**
- * 加载 PDF 文档
- */
-async function loadPDF(arrayBuffer: ArrayBuffer) {
-  try {
-    console.log('[PDF] 开始加载 PDF, arrayBuffer 大小:', arrayBuffer.byteLength)
-    renderError.value = null
-    
-    // 加载 PDF 文档
-    console.log('[PDF] 调用 pdfjsLib.getDocument...')
-    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer })
-    
-    console.log('[PDF] 等待 loadingTask.promise...')
-    pdfDocument.value = await loadingTask.promise
-    
-    console.log('[PDF] 文档加载成功,总页数:', pdfDocument.value.numPages)
-    
-    // 更新总页数
-    if (readerState.value) {
-      paperReaderStore.setTotalPages(
-        readerState.value.paperId,
-        pdfDocument.value.numPages
-      )
-    }
-    
-    // 等待 canvas 准备好 - 需要多次 nextTick 确保 DOM 更新
-    await nextTick()
-    await nextTick()
-    console.log('[PDF] canvas 是否存在:', !!canvasRef.value)
-    
-    if (!canvasRef.value) {
-      console.warn('[PDF] Canvas 仍未准备好,延迟渲染')
-      // 使用 setTimeout 确保 DOM 完全更新
-      setTimeout(() => renderPage(1), 100)
-    } else {
-      // 渲染第一页
-      await renderPage(1)
-    }
-  } catch (error) {
-    console.error('[PDF] 加载失败:', error)
-    renderError.value = error instanceof Error ? error.message : '加载失败'
-  }
-}
-
-/**
- * 渲染指定页面
- */
-async function renderPage(pageNumber: number) {
-  console.log('[PDF] renderPage 调用:', {
-    pageNumber,
-    hasPdfDocument: !!pdfDocument.value,
-    hasCanvas: !!canvasRef.value,
-    hasReaderState: !!readerState.value
-  })
-  
-  if (!pdfDocument.value || !canvasRef.value || !readerState.value) {
-    console.warn('[PDF] renderPage 条件不满足,跳过渲染')
-    return
-  }
-  
-  try {
-    console.log('[PDF] 获取第', pageNumber, '页...')
-    // 获取页面 - 使用原始对象而不是响应式包装
-    const pdf = pdfDocument.value
-    const page = await pdf.getPage(pageNumber)
-    console.log('[PDF] 页面获取成功')
-    
-    // 计算缩放后的视口
-    const viewport = page.getViewport({ scale: readerState.value.zoomLevel })
-    console.log('[PDF] 视口尺寸:', viewport.width, 'x', viewport.height)
-    
-    // 设置 canvas 尺寸
-    const canvas = canvasRef.value
-    const context = canvas.getContext('2d')
-    if (!context) {
-      console.error('[PDF] 无法获取 canvas context')
-      return
-    }
-    
-    canvas.width = viewport.width
-    canvas.height = viewport.height
-    console.log('[PDF] Canvas 尺寸已设置:', canvas.width, 'x', canvas.height)
-    
-    // 渲染页面
-    const renderContext = {
-      canvasContext: context,
-      viewport: viewport
-    }
-    
-    console.log('[PDF] 开始渲染到 canvas...')
-    await page.render(renderContext).promise
-    
-    console.log('[PDF] ✅ 页面渲染成功:', pageNumber)
-  } catch (error) {
-    console.error('[PDF] ❌ 渲染页面失败:', error)
-    renderError.value = error instanceof Error ? error.message : '渲染失败'
-  }
-}
-
-/**
  * 翻页
  */
-async function goToPage(delta: number) {
-  if (!readerState.value || !pdfDocument.value) return
+function goToPage(delta: number) {
+  if (!pdfViewer.value || !readerState.value) return
   
   const newPage = readerState.value.currentPage + delta
-  if (newPage < 1 || newPage > pdfDocument.value.numPages) return
+  if (newPage < 1 || newPage > (readerState.value.totalPages || 0)) return
   
+  pdfViewer.value.currentPageNumber = newPage
   paperReaderStore.setCurrentPage(readerState.value.paperId, newPage)
-  await renderPage(newPage)
 }
 
 /**
  * 缩放
  */
-async function zoom(delta: number) {
-  if (!readerState.value) return
+function zoom(delta: number) {
+  if (!pdfViewer.value) return
   
-  const newZoom = Math.max(0.5, Math.min(3.0, readerState.value.zoomLevel + delta))
-  paperReaderStore.setZoomLevel(readerState.value.paperId, newZoom)
-  await renderPage(readerState.value.currentPage)
+  if (delta > 0) {
+    pdfViewer.value.increaseScale()
+  } else {
+    pdfViewer.value.decreaseScale()
+  }
 }
 
 onMounted(() => {
   console.log('[SingleFilePage] 组件已挂载')
+  initPDFViewer()
+})
+
+onUnmounted(() => {
+  // 清理滚轮事件监听
+  if (viewerContainerRef.value && (viewerContainerRef.value as any)._wheelCleanup) {
+    ;(viewerContainerRef.value as any)._wheelCleanup()
+  }
+  
+  // 清理 PDFViewer 资源
+  if (pdfViewer.value) {
+    pdfViewer.value.cleanup()
+  }
 })
 </script>
 
@@ -242,22 +251,16 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- PDF 渲染区域 -->
-      <div class="pdf-container">
-        <div v-if="readerState.isLoading" class="loading-state">
-          <div class="loading-spinner"></div>
-          <span>加载中...</span>
-        </div>
-        <div v-else-if="renderError" class="error-state">
+      <!-- PDF 渲染区域 - PDFViewer 容器 -->
+      <div ref="viewerContainerRef" class="pdf-container">
+        <div v-if="renderError" class="error-state">
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <span>{{ renderError }}</span>
         </div>
-        <div v-else class="pdf-canvas-wrapper">
-          <!-- PDF Canvas -->
-          <canvas ref="canvasRef" class="pdf-canvas"></canvas>
-        </div>
+        <!-- PDFViewer 内层容器 -->
+        <div ref="viewerRef" class="pdfViewer"></div>
       </div>
     </div>
   </div>
@@ -302,6 +305,7 @@ onMounted(() => {
 /* PDF 阅读器 */
 .pdf-reader {
   flex: 1;
+  position: relative;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -309,13 +313,15 @@ onMounted(() => {
 
 /* 工具栏 */
 .toolbar {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   padding: 12px 16px;
   background-color: var(--color-bg-card);
   border-bottom: 1px solid var(--color-border-light);
   flex-shrink: 0;
+  gap: 24px;
 }
 
 .toolbar-left,
@@ -324,6 +330,16 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.toolbar-left {
+  position: absolute;
+  left: 16px;
+}
+
+.toolbar-right {
+  position: absolute;
+  right: 16px;
 }
 
 .paper-title {
@@ -374,51 +390,40 @@ onMounted(() => {
   text-align: center;
 }
 
-/* PDF 容器 */
+/* PDF 容器 - PDFViewer 外层容器 */
 .pdf-container {
   flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  position: absolute;
+  top: 56px; /* toolbar 高度 */
+  left: 0;
+  right: 0;
+  bottom: 0;
   overflow: auto;
   background-color: var(--color-bg-secondary);
 }
 
-/* 加载状态 */
-.loading-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  color: var(--color-text-muted);
+/* PDFViewer 内层容器 */
+.pdfViewer {
+  /* PDF.js 会自动管理内部样式 */
 }
 
-.loading-spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid var(--color-border-light);
-  border-top-color: var(--color-accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* 错误状态 */
 .error-state {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   color: var(--color-text-muted);
+  z-index: 10;
 }
 
 .error-state svg {
   width: 48px;
   height: 48px;
-  opacity: 0.5;
+  color: var(--color-error);
 }
 
 /* PDF 占位符 */
