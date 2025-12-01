@@ -1,285 +1,78 @@
 <script setup lang="ts">
 /**
  * Single File Page - PDF 阅读器页面
+ * 结构：Topbar + 左侧栏 + 主面板 + 右侧栏
  */
-import { ref, computed, watch, onMounted, onUnmounted, shallowRef } from 'vue'
+import { ref, computed } from 'vue'
 import { usePaperReaderStore } from '@stores/paper-reader/paper-reader.store'
-import * as pdfjsLib from 'pdfjs-dist'
-import { EventBus, PDFSinglePageViewer, PDFLinkService } from 'pdfjs-dist/web/pdf_viewer.mjs'
-import 'pdfjs-dist/web/pdf_viewer.css'
 
-// 配置 PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url
-).href
-console.log('[PDF] Worker 配置:', pdfjsLib.GlobalWorkerOptions.workerSrc)
+import Topbar from './singlefile.topbar/index.vue'
+import LeftSidebar from './singlefile.left-sidebar/index.vue'
+import MainPanel from './singlefile.main-panel/index.vue'
+import RightSidebar from './singlefile.right-sidebar/index.vue'
 
 const paperReaderStore = usePaperReaderStore()
-
-// 当前激活的阅读器状态
 const readerState = computed(() => paperReaderStore.activeReaderState)
 
-// PDF Viewer 相关
-const viewerContainerRef = ref<HTMLDivElement | null>(null)
-const viewerRef = ref<HTMLDivElement | null>(null)
-const pdfViewer = shallowRef<PDFSinglePageViewer | null>(null)
-const eventBus = shallowRef<EventBus | null>(null)
-const pdfLinkService = shallowRef<PDFLinkService | null>(null)
-const renderError = ref<string | null>(null)
-const loadedPaperId = ref<string | null>(null)
+// MainPanel 引用
+const mainPanelRef = ref<InstanceType<typeof MainPanel> | null>(null)
 
-// PDF 文档缓存 (LRU,最多 5 个)
-const MAX_CACHE_SIZE = 5
-const pdfDocumentCache = new Map<string, pdfjsLib.PDFDocumentProxy>()
-const cacheAccessOrder: string[] = [] // 记录访问顺序,用于 LRU
+// 侧边栏宽度
+const leftSidebarWidth = ref(280)
+const rightSidebarWidth = ref(320)
 
-// 监听 pdfPath 变化,直接加载 PDF
-watch(
-  () => readerState.value?.pdfPath,
-  async (pdfPath, oldPdfPath) => {
-    const state = readerState.value
-    console.log('[SingleFilePage] pdfPath 变化:', {
-      pdfPath,
-      paperId: state?.paperId,
-      loadedPaperId: loadedPaperId.value
-    })
-    
-    // 只在 pdfPath 存在且未加载过该论文时加载
-    if (pdfPath && state && state.paperId !== loadedPaperId.value) {
-      loadedPaperId.value = state.paperId
-      await loadPDFFromPath(pdfPath)
-    }
-  },
-  { immediate: true }
-)
+// 侧边栏折叠状态（默认折叠）
+const leftCollapsed = ref(true)
+const rightCollapsed = ref(true)
 
-// 监听 store 的 zoomLevel 变化,同步到 PDFViewer
-watch(
-  () => readerState.value?.zoomLevel,
-  (zoomLevel) => {
-    if (pdfViewer.value && zoomLevel !== undefined) {
-      // 只有当 PDFViewer 的 scale 和 store 不同时才更新
-      if (Math.abs(pdfViewer.value.currentScale - zoomLevel) > 0.001) {
-        pdfViewer.value.currentScale = zoomLevel
-      }
-    }
-  }
-)
+// 拖拽调整左侧栏宽度
+const isResizingLeft = ref(false)
 
-/**
- * 初始化 PDF Viewer
- */
-function initPDFViewer() {
-  if (!viewerContainerRef.value || !viewerRef.value) return
-  
-  console.log('[PDF] 初始化 PDFSinglePageViewer')
-  
-  // 创建 EventBus
-  eventBus.value = new EventBus()
-  
-  // 创建 LinkService
-  pdfLinkService.value = new PDFLinkService({
-    eventBus: eventBus.value
-  })
-  
-  // 创建 PDFSinglePageViewer
-  pdfViewer.value = new PDFSinglePageViewer({
-    container: viewerContainerRef.value,
-    viewer: viewerRef.value,
-    eventBus: eventBus.value,
-    linkService: pdfLinkService.value
-  })
-  
-  pdfLinkService.value.setViewer(pdfViewer.value)
-  
-  // 添加 Ctrl+滚轮缩放支持
-  setupWheelZoom()
-  
-  console.log('[PDF] PDFSinglePageViewer 初始化完成')
+function startResizeLeft() {
+  isResizingLeft.value = true
+  document.addEventListener('mousemove', onResizeLeft)
+  document.addEventListener('mouseup', stopResizeLeft)
 }
 
-/**
- * 设置滚轮缩放
- */
-function setupWheelZoom() {
-  if (!viewerContainerRef.value) return
-  
-  const container = viewerContainerRef.value
-  
-  const handleWheel = (evt: WheelEvent) => {
-    // 检查是否按下 Ctrl 或 Meta 键
-    if (evt.ctrlKey || evt.metaKey) {
-      evt.preventDefault()
-      
-      if (!readerState.value) return
-      
-      // 获取当前缩放比例 (从 store)
-      const currentScale = readerState.value.zoomLevel
-      
-      // 计算缩放因子 (基于滚轮滚动量)
-      // deltaY > 0 表示向下滚动 = 缩小
-      // deltaY < 0 表示向上滚动 = 放大
-      const zoomFactor = evt.deltaY > 0 ? 0.9 : 1.1
-      
-      // 计算新的缩放比例
-      let newScale = currentScale * zoomFactor
-      
-      // 限制缩放范围 (0.25x - 4x)
-      newScale = Math.max(0.25, Math.min(4, newScale))
-      
-      // 更新 store (watch 会自动同步到 PDFViewer)
-      paperReaderStore.setZoomLevel(readerState.value.paperId, newScale)
-    }
-  }
-  
-  container.addEventListener('wheel', handleWheel, { passive: false })
-  
-  // 清理函数
-  const cleanup = () => {
-    container.removeEventListener('wheel', handleWheel)
-  }
-  
-  // 保存清理函数供 onUnmounted 使用
-  ;(container as any)._wheelCleanup = cleanup
+function onResizeLeft(e: MouseEvent) {
+  if (!isResizingLeft.value) return
+  const newWidth = e.clientX - 40 // 减去 navbar 宽度
+  leftSidebarWidth.value = Math.max(200, Math.min(400, newWidth))
 }
 
-/**
- * 更新 LRU 缓存访问顺序
- */
-function updateCacheAccess(pdfPath: string) {
-  // 移除旧的访问记录
-  const index = cacheAccessOrder.indexOf(pdfPath)
-  if (index > -1) {
-    cacheAccessOrder.splice(index, 1)
-  }
-  // 添加到最前面(最近访问)
-  cacheAccessOrder.unshift(pdfPath)
+function stopResizeLeft() {
+  isResizingLeft.value = false
+  document.removeEventListener('mousemove', onResizeLeft)
+  document.removeEventListener('mouseup', stopResizeLeft)
 }
 
-/**
- * 清理最旧的缓存
- */
-function evictOldestCache() {
-  if (pdfDocumentCache.size >= MAX_CACHE_SIZE) {
-    // 移除最久未访问的
-    const oldestPath = cacheAccessOrder.pop()
-    if (oldestPath) {
-      const doc = pdfDocumentCache.get(oldestPath)
-      if (doc) {
-        doc.destroy() // 释放资源
-        pdfDocumentCache.delete(oldestPath)
-        console.log('[PDF Cache] 清理缓存:', oldestPath)
-      }
-    }
+// 拖拽调整右侧栏宽度
+function startResizeRight(e: MouseEvent) {
+  const startX = e.clientX
+  const startWidth = rightSidebarWidth.value
+
+  const onMove = (e: MouseEvent) => {
+    const delta = startX - e.clientX
+    rightSidebarWidth.value = Math.max(240, Math.min(480, startWidth + delta))
   }
+
+  const onUp = () => {
+    document.removeEventListener('mousemove', onMove)
+    document.removeEventListener('mouseup', onUp)
+  }
+
+  document.addEventListener('mousemove', onMove)
+  document.addEventListener('mouseup', onUp)
 }
 
-/**
- * 从路径加载 PDF
- */
-async function loadPDFFromPath(pdfPath: string) {
-  try {
-    console.log('[PDF] 从路径加载 PDF:', pdfPath)
-    renderError.value = null
-    
-    let pdfDocument: pdfjsLib.PDFDocumentProxy
-    
-    // 检查缓存
-    if (pdfDocumentCache.has(pdfPath)) {
-      console.log('[PDF] ✅ 从缓存加载')
-      pdfDocument = pdfDocumentCache.get(pdfPath)!
-      updateCacheAccess(pdfPath)
-    } else {
-      console.log('[PDF] 📥 从文件加载')
-      
-      // 通过 IPC 读取 PDF 文件
-      const arrayBuffer = await window.api.pdf.readPDF(pdfPath)
-      console.log('[PDF] PDF 数据读取成功:', arrayBuffer.byteLength, 'bytes')
-      
-      // 加载 PDF 文档
-      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer })
-      pdfDocument = await loadingTask.promise
-      
-      console.log('[PDF] 文档加载成功,总页数:', pdfDocument.numPages)
-      
-      // 添加到缓存
-      evictOldestCache() // 先清理旧缓存
-      pdfDocumentCache.set(pdfPath, pdfDocument)
-      updateCacheAccess(pdfPath)
-      console.log('[PDF] 💾 已缓存,当前缓存数:', pdfDocumentCache.size)
-    }
-    
-    // 更新总页数
-    if (readerState.value) {
-      paperReaderStore.setTotalPages(
-        readerState.value.paperId,
-        pdfDocument.numPages
-      )
-    }
-    
-    // 设置文档到 viewer
-    if (pdfViewer.value && pdfLinkService.value) {
-      pdfLinkService.value.setDocument(pdfDocument)
-      pdfViewer.value.setDocument(pdfDocument)
-      console.log('[PDF] ✅ 文档已设置到 viewer')
-    }
-  } catch (error) {
-    console.error('[PDF] 从路径加载失败:', error)
-    renderError.value = error instanceof Error ? error.message : '加载失败'
-  }
+// 工具栏事件处理
+function handleGoToPage(delta: number) {
+  mainPanelRef.value?.goToPage(delta)
 }
 
-/**
- * 翻页
- */
-function goToPage(delta: number) {
-  if (!pdfViewer.value || !readerState.value) return
-  
-  const newPage = readerState.value.currentPage + delta
-  if (newPage < 1 || newPage > (readerState.value.totalPages || 0)) return
-  
-  pdfViewer.value.currentPageNumber = newPage
-  paperReaderStore.setCurrentPage(readerState.value.paperId, newPage)
+function handleZoom(delta: number) {
+  mainPanelRef.value?.zoom(delta)
 }
-
-/**
- * 缩放
- */
-function zoom(delta: number) {
-  if (!pdfViewer.value) return
-  
-  if (delta > 0) {
-    pdfViewer.value.increaseScale()
-  } else {
-    pdfViewer.value.decreaseScale()
-  }
-}
-
-onMounted(() => {
-  console.log('[SingleFilePage] 组件已挂载')
-  initPDFViewer()
-})
-
-onUnmounted(() => {
-  // 清理滚轮事件监听
-  if (viewerContainerRef.value && (viewerContainerRef.value as any)._wheelCleanup) {
-    ;(viewerContainerRef.value as any)._wheelCleanup()
-  }
-  
-  // 清理 PDFViewer 资源
-  if (pdfViewer.value) {
-    pdfViewer.value.cleanup()
-  }
-  
-  // 清理所有缓存的 PDF 文档
-  console.log('[PDF Cache] 清理所有缓存,共', pdfDocumentCache.size, '个文档')
-  pdfDocumentCache.forEach((doc) => {
-    doc.destroy()
-  })
-  pdfDocumentCache.clear()
-  cacheAccessOrder.length = 0
-})
 </script>
 
 <template>
@@ -295,54 +88,37 @@ onUnmounted(() => {
     </div>
 
     <!-- PDF 阅读器 -->
-    <div v-else class="pdf-reader">
-      <!-- 工具栏 -->
-      <div class="toolbar">
-        <div class="toolbar-left">
-          <span class="paper-title">{{ readerState.title }}</span>
-        </div>
-        <div class="toolbar-center">
-          <button class="tool-btn" title="上一页" @click="goToPage(-1)" :disabled="readerState.currentPage <= 1">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <span class="page-info">
-            {{ readerState.currentPage }} / {{ readerState.totalPages || '...' }}
-          </span>
-          <button class="tool-btn" title="下一页" @click="goToPage(1)" :disabled="readerState.currentPage >= (readerState.totalPages || 0)">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        </div>
-        <div class="toolbar-right">
-          <button class="tool-btn" title="缩小" @click="zoom(-0.1)">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
-            </svg>
-          </button>
-          <span class="zoom-level">{{ Math.round(readerState.zoomLevel * 100) }}%</span>
-          <button class="tool-btn" title="放大" @click="zoom(0.1)">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-            </svg>
-          </button>
-        </div>
-      </div>
+    <template v-else>
+      <!-- 顶部工具栏 -->
+      <Topbar 
+        :left-collapsed="leftCollapsed"
+        :right-collapsed="rightCollapsed"
+        @go-to-page="handleGoToPage"
+        @zoom="handleZoom"
+        @toggle-left-sidebar="leftCollapsed = !leftCollapsed"
+        @toggle-right-sidebar="rightCollapsed = !rightCollapsed"
+      />
 
-      <!-- PDF 渲染区域 - PDFViewer 容器 -->
-      <div ref="viewerContainerRef" class="pdf-container">
-        <div v-if="renderError" class="error-state">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <span>{{ renderError }}</span>
-        </div>
-        <!-- PDFViewer 内层容器 -->
-        <div ref="viewerRef" class="pdfViewer"></div>
+      <!-- 内容区：左侧栏 + 主面板 + 右侧栏 -->
+      <div class="content-area">
+        <!-- 左侧栏 -->
+        <LeftSidebar
+          :collapsed="leftCollapsed"
+          :width="leftSidebarWidth"
+          @start-resize="startResizeLeft"
+        />
+
+        <!-- 主面板 -->
+        <MainPanel ref="mainPanelRef" />
+
+        <!-- 右侧栏 -->
+        <RightSidebar
+          :collapsed="rightCollapsed"
+          :width="rightSidebarWidth"
+          @start-resize="startResizeRight"
+        />
       </div>
-    </div>
+    </template>
   </div>
 </template>
 
@@ -352,6 +128,13 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   background-color: var(--color-bg-primary);
+  overflow: hidden;
+}
+
+/* 内容区 */
+.content-area {
+  flex: 1;
+  display: flex;
   overflow: hidden;
 }
 
@@ -380,193 +163,5 @@ onUnmounted(() => {
 .empty-text {
   font-size: 14px;
   margin: 0;
-}
-
-/* PDF 阅读器 */
-.pdf-reader {
-  flex: 1;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-/* 工具栏 */
-.toolbar {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 12px 16px;
-  background-color: var(--color-bg-card);
-  border-bottom: 1px solid var(--color-border-light);
-  flex-shrink: 0;
-  gap: 24px;
-}
-
-.toolbar-left,
-.toolbar-center,
-.toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.toolbar-left {
-  position: absolute;
-  left: 16px;
-}
-
-.toolbar-right {
-  position: absolute;
-  right: 16px;
-}
-
-.paper-title {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--color-text-primary);
-  padding: 6px 12px;
-  max-width: 280px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  background-color: var(--color-bg-secondary);
-  border: 1px solid var(--color-border-light);
-  border-radius: 6px;
-  box-shadow: 
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 1px 2px rgba(0, 0, 0, 0.04);
-  cursor: default;
-  transition: all 0.15s ease;
-}
-
-.paper-title:hover {
-  background-color: var(--color-bg-hover);
-  border-color: var(--color-border);
-  box-shadow: 
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 2px 4px rgba(0, 0, 0, 0.06);
-}
-
-.tool-btn {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background-color: transparent;
-  border-radius: 6px;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.tool-btn:hover {
-  background-color: var(--color-bg-hover);
-  color: var(--color-text-primary);
-}
-
-.tool-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.tool-btn:disabled:hover {
-  background-color: transparent;
-  color: var(--color-text-secondary);
-}
-
-.tool-btn svg {
-  width: 18px;
-  height: 18px;
-}
-
-.page-info,
-.zoom-level {
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  min-width: 80px;
-  text-align: center;
-}
-
-/* PDF 容器 - PDFViewer 外层容器 */
-.pdf-container {
-  flex: 1;
-  position: absolute;
-  top: 56px; /* toolbar 高度 */
-  left: 0;
-  right: 0;
-  bottom: 0;
-  overflow: auto;
-  background-color: var(--color-bg-secondary);
-}
-
-/* PDFViewer 内层容器 */
-.pdfViewer {
-  /* PDF.js 会自动管理内部样式 */
-}
-
-.error-state {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  color: var(--color-text-muted);
-  z-index: 10;
-}
-
-.error-state svg {
-  width: 48px;
-  height: 48px;
-  color: var(--color-error);
-}
-
-/* PDF 占位符 */
-.pdf-placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  padding: 40px;
-  color: var(--color-text-muted);
-}
-
-.pdf-placeholder svg {
-  width: 64px;
-  height: 64px;
-  opacity: 0.3;
-}
-
-.pdf-placeholder p {
-  margin: 0;
-  font-size: 14px;
-}
-
-.pdf-placeholder .hint {
-  font-size: 12px;
-  opacity: 0.7;
-}
-
-/* PDF 画布包装器 */
-.pdf-canvas-wrapper {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-}
-
-/* PDF Canvas */
-.pdf-canvas {
-  max-width: 100%;
-  max-height: 100%;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 </style>
