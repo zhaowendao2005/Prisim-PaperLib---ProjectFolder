@@ -1,0 +1,258 @@
+Prisim-PaperLib---ProjectFolder/
+├── .vscode/
+│   ├── launch.json
+│   └── tasks.json
+├── .windsurf/
+│   ├── rules/
+│   │   ├── baserule.md
+│   │   ├── file-architecture-modificationtree-zh.md
+│   │   ├── file-organization.md
+│   │   ├── how-to-distinguish-between-sqlite-database-and-gun-database.md
+│   │   ├── memory-backup.md
+│   │   ├── nomock.md
+│   │   ├── nomockcoderule.md
+│   │   ├── project-datasource-specification.md
+│   │   ├── project-naming-convention.md
+│   │   ├── project-theme-system.md
+│   │   └── storage-key-naming-convention.md
+│   └── workflows/
+│       ├── analyze-conversation.md
+│       ├── deepwiki-workflow.mdd
+│       ├── document-revision.md
+│       ├── function-research.md
+│       ├── make-a-detail-plan-v2.md
+│       ├── make-a-detail-plan.md
+│       ├── summarize-project.md
+│       ├── ui-designer.md
+│       ├── universal-feature-development-workflow-lite.md
+│       └── universal-feature-development-workflow.md
+├── .windsurf.history/
+│   ├── Fixing Import Dialog.md
+│   └── Implementing Tabbar Context Menu.md
+├── docs/
+│   ├── 规范/
+│   │   ├── project-baserule.md
+│   │   ├── project-datasource-specification.md
+│   │   ├── project-directory-structure.md
+│   │   ├── project-naming-convention.md
+│   │   └── project-theme-system.md
+│   ├── 阶段总结/
+│   │   ├── 1.论文库存储系统总结.md
+│   │   └── 2.搭建单pdf阅读页面.md
+│   ├── Design/
+│   │   ├── 初始主页面设计/
+│   │   │   ├── design.md
+│   │   │   └── design2.md
+│   │   ├── 单文件阅读视图/
+│   │   │   └── design.md
+│   │   └── 论文库存储系统/
+│   │       ├── design.md
+│   │       └── e2e-test.md
+│   └── Wiki/
+├── Prisim--PaperLib/
+│   ├── .local-packages/
+│   ├── .vscode/
+│   │   ├── extensions.json
+│   │   ├── launch.json
+│   │   └── settings.json
+│   ├── apps/
+│   │   ├── client/
+│   │   │   ├── router/
+│   │   │   ├── src/
+│   │   │   │   ├── core/
+│   │   │   │   │   ├── services/
+│   │   │   │   │   │   └── index.ts
+│   │   │   │   │   ├── types/
+│   │   │   │   │   │   └── index.ts
+│   │   │   │   │   └── utils/
+│   │   │   │   │       ├── env/
+│   │   │   │   │       │   └── index.ts
+│   │   │   │   │       └── index.ts
+│   │   │   │   ├── renderer/
+│   │   │   │   │   ├── components/
+│   │   │   │   │   │   ├── create-project-dialog/
+│   │   │   │   │   │   │   └── index.vue
+│   │   │   │   │   │   ├── drop-zone/
+│   │   │   │   │   │   │   ├── drop-zone.type.ts
+│   │   │   │   │   │   │   └── index.vue
+│   │   │   │   │   │   ├── import-confirm-dialog/
+│   │   │   │   │   │   │   └── index.vue
+│   │   │   │   │   │   ├── titlebar/
+│   │   │   │   │   │   │   └── index.vue
+│   │   │   │   │   │   ├── index.ts
+│   │   │   │   │   │   └── Versions.vue
+│   │   │   │   │   ├── composables/
+│   │   │   │   │   │   ├── page-navigation/
+│   │   │   │   │   │   │   └── index.ts
+│   │   │   │   │   │   └── index.ts
+│   │   │   │   │   ├── stores/
+│   │   │   │   │   │   ├── library-meta/
+│   │   │   │   │   │   │   ├── library-meta.datasource.ts
+│   │   │   │   │   │   │   ├── library-meta.electron.ts
+│   │   │   │   │   │   │   ├── library-meta.mock.ts
+│   │   │   │   │   │   │   └── library-meta.store.ts
+│   │   │   │   │   │   └── paper-reader/
+│   │   │   │   │   │       ├── paper-reader.datasource.ts
+│   │   │   │   │   │       ├── paper-reader.electron.ts
+│   │   │   │   │   │       ├── paper-reader.mock.ts
+│   │   │   │   │   │       └── paper-reader.store.ts
+│   │   │   │   │   ├── styles/
+│   │   │   │   │   │   ├── themes/
+│   │   │   │   │   │   │   └── variables.css
+│   │   │   │   │   │   └── index.css
+│   │   │   │   │   └── views/
+│   │   │   │   │       ├── MainPage/
+│   │   │   │   │       │   ├── content/
+│   │   │   │   │       │   │   ├── home-page/
+│   │   │   │   │       │   │   │   ├── homepage.left-sidebar/
+│   │   │   │   │       │   │   │   │   ├── homepage.content/
+│   │   │   │   │       │   │   │   │   │   ├── Project Dashboard/
+│   │   │   │   │       │   │   │   │   │   └── index.vue
+│   │   │   │   │       │   │   │   │   ├── homepage.navbar/
+│   │   │   │   │       │   │   │   │   │   └── index.vue
+│   │   │   │   │       │   │   │   │   └── index.vue
+│   │   │   │   │       │   │   │   ├── homepage.main-panel/
+│   │   │   │   │       │   │   │   │   ├── index.vue
+│   │   │   │   │       │   │   │   │   └── ProjectDashboard.vue
+│   │   │   │   │       │   │   │   ├── homepage.right-sidebar/
+│   │   │   │   │       │   │   │   │   ├── homepage.content/
+│   │   │   │   │       │   │   │   │   │   └── index.vue
+│   │   │   │   │       │   │   │   │   ├── homepage.navbar/
+│   │   │   │   │       │   │   │   │   │   └── index.vue
+│   │   │   │   │       │   │   │   │   └── index.vue
+│   │   │   │   │       │   │   │   └── index.vue
+│   │   │   │   │       │   │   ├── new-tab-page/
+│   │   │   │   │       │   │   │   └── index.vue
+│   │   │   │   │       │   │   ├── project-page/
+│   │   │   │   │       │   │   │   ├── left-sidebar/
+│   │   │   │   │       │   │   │   │   └── index.vue
+│   │   │   │   │       │   │   │   ├── main-panel/
+│   │   │   │   │       │   │   │   │   └── index.vue
+│   │   │   │   │       │   │   │   ├── right-sidebar/
+│   │   │   │   │       │   │   │   │   └── index.vue
+│   │   │   │   │       │   │   │   └── index.vue
+│   │   │   │   │       │   │   ├── settings-page/
+│   │   │   │   │       │   │   │   ├── settings.content/
+│   │   │   │   │       │   │   │   │   ├── general.vue
+│   │   │   │   │       │   │   │   │   ├── library.vue
+│   │   │   │   │       │   │   │   │   ├── placeholder.vue
+│   │   │   │   │       │   │   │   │   └── reader.vue
+│   │   │   │   │       │   │   │   ├── settings.left/
+│   │   │   │   │       │   │   │   │   └── index.vue
+│   │   │   │   │       │   │   │   └── index.vue
+│   │   │   │   │       │   │   └── single-file-page/
+│   │   │   │   │       │   │       ├── singlefile.left-sidebar/
+│   │   │   │   │       │   │       │   ├── singlefile.content/
+│   │   │   │   │       │   │       │   │   └── index.vue
+│   │   │   │   │       │   │       │   ├── singlefile.navbar/
+│   │   │   │   │       │   │       │   │   └── index.vue
+│   │   │   │   │       │   │       │   └── index.vue
+│   │   │   │   │       │   │       ├── singlefile.main-panel/
+│   │   │   │   │       │   │       │   └── index.vue
+│   │   │   │   │       │   │       ├── singlefile.right-sidebar/
+│   │   │   │   │       │   │       │   ├── singlefile.content/
+│   │   │   │   │       │   │       │   │   ├── index.vue
+│   │   │   │   │       │   │       │   │   └── OverviewPanel.vue
+│   │   │   │   │       │   │       │   ├── singlefile.navbar/
+│   │   │   │   │       │   │       │   │   └── index.vue
+│   │   │   │   │       │   │       │   └── index.vue
+│   │   │   │   │       │   │       ├── singlefile.topbar/
+│   │   │   │   │       │   │       │   └── index.vue
+│   │   │   │   │       │   │       └── index.vue
+│   │   │   │   │       │   ├── tabbar/
+│   │   │   │   │       │   │   └── index.vue
+│   │   │   │   │       │   ├── topbar/
+│   │   │   │   │       │   │   └── index.vue
+│   │   │   │   │       │   └── index.vue
+│   │   │   │   │       └── index.ts
+│   │   │   │   ├── App.vue
+│   │   │   │   ├── env.d.ts
+│   │   │   │   └── main.ts
+│   │   │   └── index.html
+│   │   ├── electron/
+│   │   │   ├── main/
+│   │   │   │   ├── ipc/
+│   │   │   │   │   ├── library/
+│   │   │   │   │   │   └── library.ipc.ts
+│   │   │   │   │   ├── pdf/
+│   │   │   │   │   │   └── pdf.ipc.ts
+│   │   │   │   │   ├── system/
+│   │   │   │   │   │   └── system.ipc.ts
+│   │   │   │   │   ├── window/
+│   │   │   │   │   │   └── window.ipc.ts
+│   │   │   │   │   └── ipc.register.ts
+│   │   │   │   ├── services/
+│   │   │   │   │   ├── library/
+│   │   │   │   │   │   ├── library.service.ts
+│   │   │   │   │   │   ├── pdf-type-detector.ts
+│   │   │   │   │   │   └── watcher.service.ts
+│   │   │   │   │   ├── system/
+│   │   │   │   │   │   └── system.service.ts
+│   │   │   │   │   └── window/
+│   │   │   │   │       └── window.service.ts
+│   │   │   │   └── index.ts
+│   │   │   └── preload/
+│   │   │       ├── apis/
+│   │   │       │   ├── library/
+│   │   │       │   │   └── library.api.ts
+│   │   │       │   ├── pdf/
+│   │   │       │   │   └── pdf.api.ts
+│   │   │       │   ├── system/
+│   │   │       │   │   └── system.api.ts
+│   │   │       │   ├── utils/
+│   │   │       │   │   └── utils.api.ts
+│   │   │       │   ├── window/
+│   │   │       │   │   └── window.api.ts
+│   │   │       │   └── api.aggregate.ts
+│   │   │       ├── index.d.ts
+│   │   │       └── index.ts
+│   │   └── shared/
+│   │       ├── types/
+│   │       │   ├── ipc-api/
+│   │       │   │   └── ipc-api.type.ts
+│   │       │   ├── library/
+│   │       │   │   └── library.type.ts
+│   │       │   ├── system/
+│   │       │   │   └── system.type.ts
+│   │       │   ├── utils/
+│   │       │   │   └── utils.type.ts
+│   │       │   ├── window/
+│   │       │   │   └── window.type.ts
+│   │       │   └── index.ts
+│   │       └── index.ts
+│   ├── backend/
+│   ├── public/
+│   │   ├── assets/
+│   │   │   └── icon.png
+│   │   └── index.ts
+│   ├── resources/
+│   ├── Script/
+│   │   └── Extension/
+│   │       ├── bypass-lint-build.js
+│   │       ├── generate-directory-tree.js
+│   │       ├── generate-icons.mjs
+│   │       └── run-with-logger.mjs
+│   ├── .editorconfig
+│   ├── .gitignore
+│   ├── .npmrc
+│   ├── .prettierignore
+│   ├── .prettierrc.yaml
+│   ├── dev-app-update.yml
+│   ├── electron-builder.yml
+│   ├── electron.vite.config.ts
+│   ├── electron.web.config.ts
+│   ├── eslint.config.mjs
+│   ├── package.json
+│   ├── pnpm-lock.yaml
+│   ├── pnpm-workspace.yaml
+│   ├── README.md
+│   ├── tsconfig.json
+│   ├── tsconfig.node.json
+│   └── tsconfig.web.json
+├── Reference/
+│   ├── ReferencePage/
+│   │   └── Mainpage.html
+│   └── ReferenceProject/
+├── .gitignore
+├── 大纲模版 拟.md
+└── package.json

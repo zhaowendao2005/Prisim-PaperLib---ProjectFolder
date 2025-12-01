@@ -47,19 +47,36 @@ END
 
 ### 执行流程
 
-#### 第一轮：规模评估
+#### 第一轮：生成项目目录树
 
-**📋 命令速查：项目规模评估**
+**📋 命令速查：生成目录树**
 ```powershell
-# 1. 统计源文件数量
+# 在项目根目录执行（生成完整目录树到 docs/Wiki/directory-tree.txt）
+npm run generate-tree
+
+
+
+**目的：**
+- 快速获取项目完整结构
+- 识别核心目录和模块分布
+- 为后续扫描制定精准计划
+
+#### 第二轮：规模评估与计划制定
+
+**📋 命令速查：读取目录树并分析**
+```powershell
+# 1. 读取生成的目录树
+Get-Content "docs\Wiki\directory-tree.txt"
+
+# 2. 统计源文件数量
 (Get-ChildItem -Recurse -Include *.ts,*.vue,*.py | Where-Object { 
   $_.FullName -notmatch 'node_modules|dist|\.git|Reference' 
 }).Count
 
-# 2. 获取目录结构（排除无关目录）
-Get-ChildItem -Recurse -Directory | Where-Object {
-  $_.FullName -notmatch 'node_modules|\.git|dist|Reference|@'
-} | Select-Object -First 100 | ForEach-Object { $_.FullName }
+# 3. 按文件类型分类统计
+Get-ChildItem -Recurse -Include *.ts,*.vue,*.py | Where-Object { 
+  $_.FullName -notmatch 'node_modules|dist|\.git|Reference' 
+} | Group-Object Extension | Select-Object Name, Count
 ```
 
 #### 输出：扫描计划

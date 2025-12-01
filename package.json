@@ -1,0 +1,5 @@
+{
+    "scripts": {
+        "generate-tree": "node Prisim--PaperLib/Script/Extension/generate-directory-tree.js ./docs/Wiki/directory-tree.txt"
+    }
+}
