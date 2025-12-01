@@ -31,3 +31,14 @@ export type {
 
 // Utils API
 export type { UtilsApi } from './utils/utils.type'
+
+// MinerU API（OCR 服务）
+export type {
+  MineruTaskState,
+  MineruConfig,
+  MineruTaskProgress,
+  MineruTask,
+  SubmitOcrTaskParams,
+  MineruApi
+} from './mineru/mineru.type'
+export { DEFAULT_MINERU_CONFIG } from './mineru/mineru.type'

@@ -3,6 +3,8 @@
  * 系统级功能：配置管理、路径管理、文件对话框等
  */
 
+import type { MineruConfig } from '../mineru/mineru.type'
+
 /** 应用配置 - System.config.json 结构 */
 export interface AppConfig {
   /** 存储路径配置 */
@@ -26,6 +28,11 @@ export interface AppConfig {
     /** 自动检查更新 */
     autoCheckUpdate: boolean
   }
+  /** 扩展配置 */
+  extensions?: {
+    /** MinerU OCR 配置 */
+    mineru?: MineruConfig
+  }
 }
 
 /** 应用路径信息（解析后的完整路径） */
@@ -46,6 +53,7 @@ export type ConfigKey =
   | 'appearance.iconSize'
   | 'startup.openLastPaper'
   | 'startup.autoCheckUpdate'
+  | 'extensions.mineru'
 
 /** System API */
 export interface SystemApi {

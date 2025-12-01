@@ -5,17 +5,41 @@
  */
 import { ref, computed } from 'vue'
 import { useTabManager } from '@composables/page-navigation'
+import { useMineruTaskStore } from '@/renderer/stores/mineru-task/mineru-task.store'
 
 import Titlebar from '@components/titlebar/index.vue'
+import ProgressDialog from '../progress-dialog/index.vue'
 
 const isDark = ref(false)
 const { activeTab } = useTabManager()
+
+// MinerU 任务 Store
+const mineruStore = useMineruTaskStore()
 
 // 是否显示 title-pill（仅在 project 页面显示）
 const showTitlePill = computed(() => activeTab.value?.type === 'project')
 
 // 临时：selectedPaper 标题显示
 const selectedPaperTitle = ref('Attention Is All You Need')
+
+// ===== 进度按钮相关 =====
+
+/** 进度对话框是否可见 */
+const progressDialogVisible = ref(false)
+
+/** 是否显示进度按钮（有任务时显示） */
+const showProgressButton = computed(() => mineruStore.globalProgress.total > 0)
+
+/** 是否有活跃任务 */
+const hasActiveTasks = computed(() => mineruStore.hasRunningTask)
+
+/** 进度统计 */
+const progressStats = computed(() => mineruStore.globalProgress)
+
+/** 切换进度对话框 */
+function toggleProgressDialog(): void {
+  progressDialogVisible.value = !progressDialogVisible.value
+}
 </script>
 
 <template>
@@ -35,6 +59,19 @@ const selectedPaperTitle = ref('Attention Is All You Need')
 
     <!-- Right Toolbar -->
     <div class="title-toolbar">
+      <!-- 进度按钮 -->
+      <button
+        v-if="showProgressButton"
+        class="toolbar-btn progress-btn"
+        :class="{ active: hasActiveTasks }"
+        @click="toggleProgressDialog"
+      >
+        <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
+        <span v-if="hasActiveTasks" class="progress-badge">{{ progressStats.running }}</span>
+      </button>
+
       <button class="toolbar-btn" @click="isDark = !isDark">
         <svg v-if="isDark" class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -50,6 +87,9 @@ const selectedPaperTitle = ref('Attention Is All You Need')
       </button>
     </div>
   </Titlebar>
+
+  <!-- 进度对话框 -->
+  <ProgressDialog v-model:visible="progressDialogVisible" />
 </template>
 
 <style scoped>
@@ -125,5 +165,40 @@ const selectedPaperTitle = ref('Attention Is All You Need')
   width: 16px;
   height: 16px;
   flex-shrink: 0;
+}
+
+/* 进度按钮样式 */
+.progress-btn {
+  position: relative;
+}
+
+.progress-btn.active {
+  color: var(--color-accent);
+}
+
+.progress-btn.active .icon {
+  animation: pulse 2s infinite;
+}
+
+.progress-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  background: var(--color-accent);
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }
 </style>

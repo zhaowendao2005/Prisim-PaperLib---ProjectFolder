@@ -7,6 +7,7 @@ import { registerWindowIpcHandlers } from './window/window.ipc'
 import { registerSystemIpcHandlers } from './system/system.ipc'
 import { registerLibraryIpcHandlers } from './library/library.ipc'
 import { registerPdfIpcHandlers } from './pdf/pdf.ipc'
+import { registerMineruIpcHandlers } from './mineru/mineru.ipc'
 
 /**
  * 注册所有 IPC 处理器
@@ -26,4 +27,7 @@ export function registerAllIpcHandlers(): void {
 
   // PDF 功能
   registerPdfIpcHandlers()
+
+  // MinerU OCR 功能
+  registerMineruIpcHandlers()
 }

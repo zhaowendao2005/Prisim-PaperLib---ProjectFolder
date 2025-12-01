@@ -7,6 +7,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { createMainWindow } from './services/window/window.service'
 import { registerAllIpcHandlers } from './ipc/ipc.register'
 import { initializeAppDirectories } from './services/system/system.service'
+import { initializeMineruService } from './services/mineru/mineru.service'
 
 /**
  * 安装 Vue DevTools 扩展（仅开发环境）
@@ -43,6 +44,9 @@ app.whenReady().then(async () => {
 
   // 初始化应用数据目录
   initializeAppDirectories()
+
+  // 初始化 MinerU 服务
+  initializeMineruService()
 
   // 创建主窗口
   createMainWindow()

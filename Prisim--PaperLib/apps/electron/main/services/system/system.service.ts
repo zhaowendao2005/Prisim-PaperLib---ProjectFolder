@@ -102,7 +102,8 @@ function mergeWithDefaults(partial: Partial<AppConfig>): AppConfig {
     startup: {
       ...defaults.startup,
       ...partial.startup
-    }
+    },
+    extensions: partial.extensions
   }
 }
 
@@ -147,7 +148,9 @@ export function getConfig(): AppConfig {
 export function getConfigValue<T>(key: ConfigKey): T {
   const config = loadConfigRaw()
   const [section, field] = key.split('.') as [keyof AppConfig, string]
-  return (config[section] as Record<string, unknown>)[field] as T
+  const sectionObj = config[section] as Record<string, unknown> | undefined
+  if (!sectionObj) return undefined as T
+  return sectionObj[field] as T
 }
 
 /**
@@ -156,6 +159,11 @@ export function getConfigValue<T>(key: ConfigKey): T {
 export function setConfigValue<T>(key: ConfigKey, value: T): void {
   const config = loadConfigRaw()
   const [section, field] = key.split('.') as [keyof AppConfig, string]
+  
+  // 确保 section 存在
+  if (!config[section]) {
+    ;(config as Record<string, unknown>)[section] = {}
+  }
   ;(config[section] as Record<string, unknown>)[field] = value
   saveConfig(config)
 }

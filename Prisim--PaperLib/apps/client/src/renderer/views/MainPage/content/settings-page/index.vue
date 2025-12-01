@@ -8,6 +8,7 @@ import SettingsLeft from './settings.left/index.vue'
 import GeneralSettings from './settings.content/general.vue'
 import ReaderSettings from './settings.content/reader.vue'
 import LibrarySettings from './settings.content/library.vue'
+import ExtensionsSettings from './settings.content/extensions.vue'
 import PlaceholderSettings from './settings.content/placeholder.vue'
 
 // 当前激活的设置 Tab
@@ -39,6 +40,7 @@ const tabNames: Record<string, string> = {
         <GeneralSettings v-if="activeTab === 'general'" />
         <ReaderSettings v-else-if="activeTab === 'reader'" />
         <LibrarySettings v-else-if="activeTab === 'library'" />
+        <ExtensionsSettings v-else-if="activeTab === 'extensions'" />
         <PlaceholderSettings
           v-else
           :tab-name="tabNames[activeTab] || activeTab"

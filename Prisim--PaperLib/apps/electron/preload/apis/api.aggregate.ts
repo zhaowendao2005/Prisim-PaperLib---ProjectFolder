@@ -7,11 +7,13 @@ import { systemApi } from './system/system.api'
 import { libraryApi } from './library/library.api'
 import { utilsApi } from './utils/utils.api'
 import { pdfApi } from './pdf/pdf.api'
+import { mineruApi } from './mineru/mineru.api'
 
 export const api = {
   window: windowApi,
   system: systemApi,
   library: libraryApi,
   utils: utilsApi,
-  pdf: pdfApi
+  pdf: pdfApi,
+  mineru: mineruApi
 }

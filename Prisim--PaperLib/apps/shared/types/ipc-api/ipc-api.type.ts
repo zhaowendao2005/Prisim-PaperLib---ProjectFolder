@@ -6,6 +6,7 @@ import type { WindowApi } from '../window/window.type'
 import type { SystemApi } from '../system/system.type'
 import type { LibraryApi } from '../library/library.type'
 import type { UtilsApi } from '../utils/utils.type'
+import type { MineruApi } from '../mineru/mineru.type'
 
 /** IPC API 聚合类型（Client ↔ Electron 通信） */
 export interface IpcApi {
@@ -13,4 +14,5 @@ export interface IpcApi {
   system: SystemApi
   library: LibraryApi
   utils: UtilsApi
+  mineru: MineruApi
 }
