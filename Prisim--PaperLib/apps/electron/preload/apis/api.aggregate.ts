@@ -6,10 +6,12 @@ import { windowApi } from './window/window.api'
 import { systemApi } from './system/system.api'
 import { libraryApi } from './library/library.api'
 import { utilsApi } from './utils/utils.api'
+import { pdfApi } from './pdf/pdf.api'
 
 export const api = {
   window: windowApi,
   system: systemApi,
   library: libraryApi,
-  utils: utilsApi
+  utils: utilsApi,
+  pdf: pdfApi
 }

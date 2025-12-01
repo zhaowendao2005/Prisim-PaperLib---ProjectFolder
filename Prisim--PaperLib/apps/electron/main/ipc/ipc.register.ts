@@ -6,6 +6,7 @@ import { ipcMain } from 'electron'
 import { registerWindowIpcHandlers } from './window/window.ipc'
 import { registerSystemIpcHandlers } from './system/system.ipc'
 import { registerLibraryIpcHandlers } from './library/library.ipc'
+import { registerPdfIpcHandlers } from './pdf/pdf.ipc'
 
 /**
  * 注册所有 IPC 处理器
@@ -22,4 +23,7 @@ export function registerAllIpcHandlers(): void {
 
   // 论文库功能
   registerLibraryIpcHandlers()
+
+  // PDF 功能
+  registerPdfIpcHandlers()
 }

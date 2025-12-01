@@ -40,7 +40,7 @@ function mapMetaToPaper(meta: PaperMeta, projectId: string): Paper {
     abstract: '',
     tags: meta.tags,
     projectId,
-    pdfPath: meta.filename,
+    pdfPath: meta.pdfPath || null,  // 使用后端填充的完整路径
     isRead: false,
     isAnnotated: false,
     createdAt: new Date(meta.addedAt),

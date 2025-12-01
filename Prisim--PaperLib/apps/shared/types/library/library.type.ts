@@ -49,6 +49,8 @@ export interface PaperMeta {
   dirname: string
   /** PDF 文件名（如 "Attention Is All You Need.pdf"） */
   filename: string
+  /** PDF 完整路径（运行时由后端填充） */
+  pdfPath?: string
   /** 标题（可编辑，默认从文件名提取） */
   title: string
   /** 作者列表 */

@@ -9,13 +9,22 @@ import { ref, computed } from 'vue'
 // ============================================================
 
 /** Tab 类型 */
-export type TabType = 'home' | 'project' | 'new-tab' | 'settings'
+export type TabType = 'home' | 'project' | 'new-tab' | 'settings' | 'single-file-page'
+
+/** Tab 元数据 */
+export interface TabMetadata {
+  paperId?: string      // 论文 ID
+  libraryId?: string    // 所属论文库 ID
+  pdfPath?: string      // PDF 文件路径
+  [key: string]: any    // 其他扩展字段
+}
 
 /** Tab 项定义 */
 export interface TabItem {
   id: string
   type: TabType
   title: string
+  metadata?: TabMetadata  // Tab 元数据
 }
 
 /** Tab 列表 */

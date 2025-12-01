@@ -6,11 +6,13 @@
 import { ref, watch, computed } from 'vue'
 import { useDataCardStore } from '@stores/home_datacard/home_datacard.store'
 import { useLibraryMetaStore } from '@stores/library-meta/library-meta.store'
+import { usePaperReaderStore } from '@stores/paper-reader/paper-reader.store'
 import type { Paper } from '@stores/home_datacard/home_datacard.datasource'
 import { isElectron } from '@/core/utils/env'
 
 const store = useDataCardStore()
 const libraryMetaStore = isElectron() ? useLibraryMetaStore() : null
+const paperReaderStore = usePaperReaderStore()
 
 // 当前选中卡片的论文列表
 const papers = ref<Paper[]>([])
@@ -95,6 +97,18 @@ async function confirmDelete() {
 
 function cancelDelete() {
   showDeleteConfirm.value = false
+}
+
+// 点击论文项
+function handlePaperClick(paper: Paper) {
+  if (!store.selectedCard) return
+  
+  paperReaderStore.openPaper(
+    paper.id,
+    store.selectedCard.id,
+    paper.pdfPath || '',
+    paper.title
+  )
 }
 </script>
 
@@ -215,6 +229,7 @@ function cancelDelete() {
               :key="paper.id" 
               class="paper-item"
               :class="{ 'is-read': paper.isRead }"
+              @click="handlePaperClick(paper)"
             >
               <div class="paper-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">

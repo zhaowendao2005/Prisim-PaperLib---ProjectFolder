@@ -5,11 +5,14 @@
  */
 import { ref, onMounted } from 'vue'
 import { useDataCardStore } from '@stores/home_datacard/home_datacard.store'
+import { usePaperReaderStore } from '@stores/paper-reader/paper-reader.store'
+import type { Paper } from '@stores/home_datacard/home_datacard.datasource'
 
 type ViewMode = 'tree' | 'flat'
 
 const viewMode = ref<ViewMode>('tree')
 const store = useDataCardStore()
+const paperReaderStore = usePaperReaderStore()
 
 // 展开状态
 const expandedProjects = ref<Set<string>>(new Set(['1', '2', '3', '4', '5']))
@@ -20,6 +23,16 @@ function toggleExpand(projectId: string) {
   } else {
     expandedProjects.value.add(projectId)
   }
+}
+
+// 点击论文节点
+function handlePaperClick(paper: Paper, projectId: string) {
+  paperReaderStore.openPaper(
+    paper.id,
+    projectId,
+    paper.pdfPath || '',
+    paper.title
+  )
 }
 
 onMounted(() => {
@@ -99,6 +112,7 @@ onMounted(() => {
               v-for="paper in store.getPapersForProject(project.id)" 
               :key="paper.id" 
               class="paper-node"
+              @click="handlePaperClick(paper, project.id)"
             >
               <svg class="paper-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -115,6 +129,7 @@ onMounted(() => {
           v-for="paper in store.papers" 
           :key="paper.id" 
           class="flat-paper-item"
+          @click="handlePaperClick(paper, paper.projectId || '')"
         >
           <svg class="paper-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />

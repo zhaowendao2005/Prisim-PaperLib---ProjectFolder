@@ -11,6 +11,7 @@ import HomePage from './content/home-page/index.vue'
 import ProjectPage from './content/project-page/index.vue'
 import NewTabPage from './content/new-tab-page/index.vue'
 import SettingsPage from './content/settings-page/index.vue'
+import SingleFilePage from './content/single-file-page/index.vue'
 
 const isDark = ref(false)
 const { activeTab } = useTabManager()
@@ -31,6 +32,7 @@ const { activeTab } = useTabManager()
       <ProjectPage v-else-if="activeTab?.type === 'project'" />
       <NewTabPage v-else-if="activeTab?.type === 'new-tab'" />
       <SettingsPage v-else-if="activeTab?.type === 'settings'" />
+      <SingleFilePage v-else-if="activeTab?.type === 'single-file-page'" />
     </main>
   </div>
 </template>

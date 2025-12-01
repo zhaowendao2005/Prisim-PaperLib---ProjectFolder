@@ -48,6 +48,19 @@ function ensureDir(dirPath: string): void {
   }
 }
 
+/** 计算论文 PDF 完整路径 */
+function getPaperPdfPath(databasePath: string, meta: PaperMeta): string {
+  return join(databasePath, PAPERS_DIR, meta.dirname, meta.filename)
+}
+
+/** 为 PaperMeta 填充 pdfPath */
+function fillPdfPath(databasePath: string, meta: PaperMeta): PaperMeta {
+  return {
+    ...meta,
+    pdfPath: getPaperPdfPath(databasePath, meta)
+  }
+}
+
 /** 从文件名提取标题（去掉扩展名） */
 function extractTitleFromFilename(filename: string): string {
   return filename.replace(/\.pdf$/i, '').trim()
@@ -281,14 +294,17 @@ function getDatabasePath(databaseId: string): string {
 export function getPapers(databaseId: string): PaperMeta[] {
   const databasePath = getDatabasePath(databaseId)
   const index = loadIndex(databasePath)
-  return Object.values(index.papers)
+  // 为每个论文填充完整的 pdfPath
+  return Object.values(index.papers).map(meta => fillPdfPath(databasePath, meta))
 }
 
 /** 获取单篇论文 */
 export function getPaper(databaseId: string, paperId: string): PaperMeta | null {
   const databasePath = getDatabasePath(databaseId)
   const index = loadIndex(databasePath)
-  return index.papers[paperId] || null
+  const meta = index.papers[paperId]
+  // 填充完整的 pdfPath
+  return meta ? fillPdfPath(databasePath, meta) : null
 }
 
 /** 导入论文 */
@@ -344,12 +360,13 @@ export function importPapers(databaseId: string, filePaths: string[]): PaperMeta
       updatedAt: now
     }
 
-    // 保存 meta.json
+    // 保存 meta.json (不包含 pdfPath,因为是运行时计算的)
     writeFileSync(join(paperDir, META_FILE), JSON.stringify(meta, null, 2), 'utf-8')
 
     // 更新索引
     index.papers[id] = meta
-    importedPapers.push(meta)
+    // 返回时填充完整的 pdfPath
+    importedPapers.push(fillPdfPath(databasePath, meta))
   }
 
   // 保存索引
@@ -358,7 +375,7 @@ export function importPapers(databaseId: string, filePaths: string[]): PaperMeta
   // 更新数据库论文数量
   updateDatabasePaperCount(databaseId, Object.keys(index.papers).length)
 
-  // 通知前端
+  // 通知前端 (带完整 pdfPath)
   notifyFileChange({
     type: 'batch-add',
     databaseId,
