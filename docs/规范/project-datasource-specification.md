@@ -6,13 +6,23 @@
 
 ## 核心原则
 
+**职责分离**:
+- **Vue 组件**: 负责 UI 渲染和用户交互
+- **Pinia Store**: 负责状态管理和业务逻辑
+- **DataSource**: 负责环境检测和数据获取
+
+**架构流程**:
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                        Vue 组件                              │
 │                           │                                  │
 │                           ▼                                  │
 │                    useXxxStore() (Pinia)                     │
+│                     (纯状态管理)                              │
 │                           │                                  │
+│                           ▼                                  │
+│                    XxxDataSource                             │
+│                  (环境检测 + 工厂模式)                         │
 │              ┌────────────┴────────────┐                     │
 │              ▼                         ▼                     │
 │     XxxMockDataSource          XxxElectronDataSource         │
@@ -22,6 +32,11 @@
 │         模拟数据                   IPC / 本地数据库            │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+**关键设计**:
+- ✅ **环境检测在 DataSource 层**: 通过工厂模式自动选择实现
+- ✅ **Store 层无环境逻辑**: Store 只负责状态管理,不关心数据来源
+- ✅ **单例模式**: DataSource 使用单例,避免重复创建
 
 ## 目录结构
 
@@ -63,18 +78,21 @@ export const forceMock = (): boolean => {
 }
 ```
 
-## DataSource 接口定义
+## DataSource 接口定义与工厂实现
 
 ```typescript
 // renderer/stores/paper/paper.datasource.ts
 
+import { isElectron, forceMock } from '@/core/utils/env'
+import { PaperMockDataSource } from './paper.mock'
+import { PaperElectronDataSource } from './paper.electron'
 import type { Paper, PaperFilter, PaperCreateInput } from '@core/types/paper'
 
 /**
  * Paper 数据源接口
  * Mock 和 Electron 实现都必须遵循此接口
  */
-export interface PaperDataSource {
+export interface IPaperDataSource {
   /** 获取论文列表 */
   getList(filter?: PaperFilter): Promise<Paper[]>
   
@@ -93,6 +111,34 @@ export interface PaperDataSource {
   /** 搜索论文 */
   search(query: string): Promise<Paper[]>
 }
+
+/**
+ * 🎯 DataSource 工厂类
+ * 负责环境检测并自动选择 Mock 或 Electron 实现
+ */
+class PaperDataSourceFactory {
+  private static instance: IPaperDataSource | null = null
+  
+  static getInstance(): IPaperDataSource {
+    if (!this.instance) {
+      // 环境检测逻辑在这里
+      if (forceMock() || !isElectron()) {
+        console.log('[PaperDataSource] 使用 Mock 实现')
+        this.instance = new PaperMockDataSource()
+      } else {
+        console.log('[PaperDataSource] 使用 Electron 实现')
+        this.instance = new PaperElectronDataSource()
+      }
+    }
+    return this.instance
+  }
+}
+
+/**
+ * 导出单例 DataSource
+ * Store 直接使用此实例,无需关心环境检测
+ */
+export const PaperDataSource = PaperDataSourceFactory.getInstance()
 ```
 
 ## Mock 数据源实现
@@ -100,7 +146,7 @@ export interface PaperDataSource {
 ```typescript
 // renderer/stores/paper/paper.mock.ts
 
-import type { PaperDataSource } from './paper.datasource'
+import type { IPaperDataSource } from './paper.datasource'
 import type { Paper, PaperFilter, PaperCreateInput } from '@core/types/paper'
 
 /** 模拟数据 */
@@ -119,7 +165,7 @@ const mockPapers: Paper[] = [
   // ... 更多模拟数据
 ]
 
-export class PaperMockDataSource implements PaperDataSource {
+export class PaperMockDataSource implements IPaperDataSource {
   private papers = [...mockPapers]
 
   async getList(filter?: PaperFilter): Promise<Paper[]> {
@@ -191,10 +237,10 @@ export class PaperMockDataSource implements PaperDataSource {
 ```typescript
 // renderer/stores/paper/paper.electron.ts
 
-import type { PaperDataSource } from './paper.datasource'
+import type { IPaperDataSource } from './paper.datasource'
 import type { Paper, PaperFilter, PaperCreateInput } from '@core/types/paper'
 
-export class PaperElectronDataSource implements PaperDataSource {
+export class PaperElectronDataSource implements IPaperDataSource {
   async getList(filter?: PaperFilter): Promise<Paper[]> {
     return window.electron.ipcRenderer.invoke('paper:getList', filter)
   }
@@ -223,43 +269,38 @@ export class PaperElectronDataSource implements PaperDataSource {
 
 ## Pinia Store 中使用 DataSource
 
+**关键点**: Store 只负责状态管理,直接使用 DataSource 单例,无需环境检测逻辑
+
 ```typescript
 // renderer/stores/paper/paper.store.ts
 
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { Paper, PaperFilter } from '@core/types/paper'
-import type { PaperDataSource } from './paper.datasource'
-import { PaperMockDataSource } from './paper.mock'
-import { PaperElectronDataSource } from './paper.electron'
-import { isElectron, forceMock } from '@core/utils/env'
-
-/** 创建数据源实例 */
-function createDataSource(): PaperDataSource {
-  if (forceMock() || !isElectron()) {
-    console.log('[PaperStore] 使用 Mock 数据源')
-    return new PaperMockDataSource()
-  }
-  console.log('[PaperStore] 使用 Electron 数据源')
-  return new PaperElectronDataSource()
-}
+import { PaperDataSource } from './paper.datasource'  // 直接导入单例
 
 export const usePaperStore = defineStore('paper', () => {
-  // 数据源
-  const dataSource = createDataSource()
-  
-  // 状态
+  // ============================================================
+  // 状态 (State)
+  // ============================================================
   const papers = ref<Paper[]>([])
   const currentPaper = ref<Paper | null>(null)
   const loading = ref(false)
   const error = ref<Error | null>(null)
 
-  // Actions
+  // ============================================================
+  // 业务逻辑 (Actions)
+  // ============================================================
+  
+  /**
+   * 获取论文列表
+   * DataSource 会自动根据环境选择 Mock 或 Electron 实现
+   */
   async function fetchPapers(filter?: PaperFilter) {
     loading.value = true
     error.value = null
     try {
-      papers.value = await dataSource.getList(filter)
+      papers.value = await PaperDataSource.getList(filter)
     } catch (e) {
       error.value = e as Error
     } finally {
@@ -271,7 +312,7 @@ export const usePaperStore = defineStore('paper', () => {
     loading.value = true
     error.value = null
     try {
-      currentPaper.value = await dataSource.getById(id)
+      currentPaper.value = await PaperDataSource.getById(id)
     } catch (e) {
       error.value = e as Error
     } finally {
@@ -283,7 +324,7 @@ export const usePaperStore = defineStore('paper', () => {
     loading.value = true
     error.value = null
     try {
-      papers.value = await dataSource.search(query)
+      papers.value = await PaperDataSource.search(query)
     } catch (e) {
       error.value = e as Error
     } finally {
@@ -304,6 +345,12 @@ export const usePaperStore = defineStore('paper', () => {
   }
 })
 ```
+
+**优势**:
+- ✅ Store 代码简洁,只关注状态管理
+- ✅ 无环境检测代码,职责单一
+- ✅ DataSource 自动处理环境切换
+- ✅ 易于测试和维护
 
 ## 在组件中使用
 
@@ -369,11 +416,13 @@ VITE_FORCE_MOCK=true
 
 ## 注意事项
 
-1. **Mock 数据要真实** - 模拟数据应尽量接近真实数据结构，方便 UI 调试
-2. **模拟延迟** - Mock 中加入适当延迟，模拟真实网络环境
-3. **错误模拟** - Mock 可以随机抛出错误，测试错误处理逻辑
-4. **类型一致** - Mock 和 Electron 实现必须严格遵循同一接口
-5. **单例模式** - Service 使用单例，避免重复创建实例
+1. **环境检测在 DataSource 层** - Store 不应包含任何环境检测逻辑
+2. **单例模式** - DataSource 使用单例,确保环境检测只执行一次
+3. **Mock 数据要真实** - 模拟数据应尽量接近真实数据结构，方便 UI 调试
+4. **模拟延迟** - Mock 中加入适当延迟，模拟真实网络环境
+5. **错误模拟** - Mock 可以随机抛出错误，测试错误处理逻辑
+6. **类型一致** - Mock 和 Electron 实现必须严格遵循同一接口
+7. **职责分离** - Store 只负责状态管理,DataSource 负责数据获取
 
 ## 后续扩展
 
