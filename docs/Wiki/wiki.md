@@ -90,7 +90,9 @@ Prisim--PaperLib/
 │       └── types/
 │           ├── ipc-api/        # IPC API 聚合
 │           ├── library/        # 论文库类型
+│           ├── mineru/         # MinerU OCR 类型
 │           ├── system/         # 系统配置类型
+│           ├── utils/          # 工具函数类型
 │           └── window/         # 窗口控制类型
 │
 ├── Script/                     # 开发脚本
@@ -130,22 +132,28 @@ graph TB
     
     subgraph Bridge["🌉 桥接层 (Preload)"]
         direction LR
-        LibraryAPI["LibraryApi"]
+        WindowAPI["WindowApi"]
         SystemAPI["SystemApi"]
+        LibraryAPI["LibraryApi"]
+        UtilsAPI["UtilsApi"]
+        PdfAPI["PdfApi"]
         MineruAPI["MineruApi"]
     end
     
     subgraph IPC["📡 IPC 通信层"]
         direction LR
-        LibraryIPC["library.ipc.ts"]
+        WindowIPC["window.ipc.ts"]
         SystemIPC["system.ipc.ts"]
+        LibraryIPC["library.ipc.ts"]
+        PdfIPC["pdf.ipc.ts"]
         MineruIPC["mineru.ipc.ts"]
     end
     
     subgraph Service["⚙️ 服务层 (Main Process)"]
         direction LR
-        LibraryService["LibraryService<br/><small>论文管理</small>"]
+        WindowService["WindowService<br/><small>窗口控制</small>"]
         SystemService["SystemService<br/><small>配置管理</small>"]
+        LibraryService["LibraryService<br/><small>论文管理</small>"]
         MineruService["MineruService<br/><small>OCR 服务</small>"]
         WatcherService["WatcherService<br/><small>文件监听</small>"]
     end
@@ -164,51 +172,54 @@ graph TB
         OSS["☁️ 阿里云 OSS<br/><small>文件上传</small>"]
     end
     
-    %% UI → State (粗实线)
+    %% UI → State
     HomePage ==> LibraryStore
     SingleFile ==> ReaderStore
     SingleFile ==> MineruStore
     Settings ==> MineruStore
     ProgressDialog ==> MineruStore
     
-    %% State → DataSource (粗实线)
+    %% State → DataSource
     LibraryStore ==> LibraryDS
     MineruStore ==> MineruDS
     
-    %% DataSource → Bridge (曲线)
+    %% DataSource → Bridge
     LibraryDS -.-> LibraryAPI
     MineruDS -.-> MineruAPI
     MineruDS -.-> SystemAPI
     
-    %% Bridge → IPC (虚线标注)
-    LibraryAPI -.-|"🔒 contextBridge"| LibraryIPC
+    %% Bridge → IPC
+    WindowAPI -.-|"🔒 contextBridge"| WindowIPC
     SystemAPI -.-|"🔒 contextBridge"| SystemIPC
+    LibraryAPI -.-|"🔒 contextBridge"| LibraryIPC
+    PdfAPI -.-|"🔒 contextBridge"| PdfIPC
     MineruAPI -.-|"🔒 contextBridge"| MineruIPC
     
-    %% IPC → Service (粗实线)
-    LibraryIPC ==> LibraryService
+    %% IPC → Service
+    WindowIPC ==> WindowService
     SystemIPC ==> SystemService
+    LibraryIPC ==> LibraryService
     MineruIPC ==> MineruService
     
-    %% Service → Storage (实线)
+    %% Service → Storage
     LibraryService --> SQLite
     LibraryService --> FileSystem
     SystemService --> Config
     MineruService --> MineruCache
     
-    %% Service → External (粗虚线)
+    %% Service → External
     MineruService ==o MineruAPI_External
     MineruService ==o OSS
     
-    %% Watcher → Service (双向)
+    %% Watcher
     WatcherService <--> LibraryService
     FileSystem -.-|"👁️ 监听"| WatcherService
     
-    %% 事件反向通知 (虚线箭头)
+    %% 事件反向通知
     LibraryService -.->|"📢 事件广播"| LibraryIPC
     MineruService -.->|"📢 任务更新"| MineruIPC
     
-    %% 样式定义
+    %% 样式
     classDef uiClass fill:#e3f2fd,stroke:#1976d2,stroke-width:3px,color:#0d47a1,rx:10,ry:10
     classDef stateClass fill:#f3e5f5,stroke:#7b1fa2,stroke-width:3px,color:#4a148c,rx:10,ry:10
     classDef bridgeClass fill:#e0f7fa,stroke:#00838f,stroke-width:2px,color:#006064,rx:8,ry:8
@@ -220,9 +231,9 @@ graph TB
     class HomePage,SingleFile,Settings,ProgressDialog uiClass
     class LibraryStore,ReaderStore,MineruStore stateClass
     class LibraryDS,MineruDS bridgeClass
-    class LibraryAPI,SystemAPI,MineruAPI bridgeClass
-    class LibraryIPC,SystemIPC,MineruIPC ipcClass
-    class LibraryService,SystemService,MineruService,WatcherService serviceClass
+    class WindowAPI,SystemAPI,LibraryAPI,UtilsAPI,PdfAPI,MineruAPI bridgeClass
+    class WindowIPC,SystemIPC,LibraryIPC,PdfIPC,MineruIPC ipcClass
+    class WindowService,SystemService,LibraryService,MineruService,WatcherService serviceClass
     class SQLite,FileSystem,Config,MineruCache storageClass
     class MineruAPI_External,OSS externalClass
 ```
@@ -1078,6 +1089,7 @@ interface IpcApi {
   system: SystemApi   // 系统配置
   library: LibraryApi // 论文库操作
   utils: UtilsApi     // 工具函数
+  pdf: PdfApi         // PDF 操作
   mineru: MineruApi   // MinerU OCR
 }
 ```
@@ -1153,6 +1165,14 @@ interface IpcApi {
 | `testConnection` | `() => Promise<{ success: boolean; message: string }>` | 测试 API 连接 |
 | `clearTasksCache` | `() => Promise<{ success: boolean; count: number }>` | 清除任务缓存 |
 | `onTaskUpdate` | `(callback) => () => void` | 订阅任务更新事件 |
+
+---
+
+## [L9-06] PdfApi
+
+| 方法 | 签名 | 说明 |
+|------|------|------|
+| `readPdfBuffer` | `(filePath: string) => Promise<ArrayBuffer>` | 读取 PDF 文件为 ArrayBuffer |
 
 ---
 
